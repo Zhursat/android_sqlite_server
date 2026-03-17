@@ -1,1 +1,405 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Solar Monitor PRO</title>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
+
+<style>
+  body {
+    margin: 0;
+    background: #111;
+    color: #fff;
+    font-family: sans-serif;
+  }
+
+  .wrap {
+    padding: 14px;
+  }
+
+  h2 {
+    margin: 0 0 12px 0;
+  }
+
+  .toolbar {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+
+  select, button {
+    background: #1b1b1b;
+    color: #fff;
+    border: 1px solid #444;
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 14px;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  .hint {
+    color: #aaa;
+    font-size: 13px;
+  }
+
+  .chart-box {
+    position: relative;
+    height: calc(100vh - 130px);
+    min-height: 420px;
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <h2>Solar Monitor PRO</h2>
+
+  <div class="toolbar">
+    <select id="range">
+      <option value="1">1 доба</option>
+      <option value="7">7 діб</option>
+      <option value="30">1 місяць</option>
+      <option value="180">6 місяців</option>
+    </select>
+
+    <button id="btnLast5h">Останні 5 годин</button>
+    <button id="btnResetZoom">Скинути zoom</button>
+
+    <span class="hint">Колесо/пальці — zoom, перетягування — прокрутка</span>
+  </div>
+
+  <div class="chart-box">
+    <canvas id="chart"></canvas>
+  </div>
+</div>
+
+<script>
+const SERVER_URL = 'http://192.168.0.183:5000/api/history';
+
+const chart = new Chart(document.getElementById('chart').getContext('2d'), {
+  type: 'line',
+  data: {
+    datasets: [
+      {
+        label: 'Сонце',
+        data: [],
+        borderColor: 'rgb(255, 255, 0)',
+        backgroundColor: 'rgba(255, 255, 0, 0.1)',
+        fill: true,
+        pointRadius: 2,
+        pointHoverRadius: 4,
+        tension: 0
+      },
+      {
+        label: 'Споживання',
+        data: [],
+        borderColor: 'rgb(0, 255, 0)',
+        backgroundColor: 'rgba(0, 255, 0, 0.1)',
+        fill: true,
+        pointRadius: 2,
+        pointHoverRadius: 4,
+        tension: 0
+      },
+      {
+        label: 'АКБ',
+        data: [],
+        borderColor: 'rgb(0, 255, 255)',
+        backgroundColor: 'rgba(0, 255, 255, 0.1)',
+        fill: true,
+        yAxisID: 'y1',
+        pointRadius: 2,
+        pointHoverRadius: 4,
+        tension: 0
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    normalized: true,
+    parsing: false,
+    interaction: {
+      mode: 'index',
+      intersect: false
+    },
+    plugins: {
+      legend: {
+        labels: {
+          color: '#ddd'
+        }
+      },
+      tooltip: {
+        callbacks: {
+          title(items) {
+            if (!items.length) return '';
+            const x = items[0].raw.x;
+            const d = new Date(x);
+            return d.toLocaleString('uk-UA', {
+              day: '2-digit',
+              month: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit'
+            });
+          }
+        }
+      },
+      zoom: {
+        limits: {
+          x: { minRange: 5 * 60 * 1000 }
+        },
+        pan: {
+          enabled: true,
+          mode: 'x',
+          threshold: 5
+        },
+        zoom: {
+          wheel: {
+            enabled: true
+          },
+          pinch: {
+            enabled: true
+          },
+          drag: {
+            enabled: true,
+            backgroundColor: 'rgba(150,150,150,0.15)',
+            borderColor: 'rgba(200,200,200,0.3)',
+            borderWidth: 1
+          },
+          mode: 'x'
+        }
+      }
+    },
+    scales: {
+      x: {
+        type: 'linear',
+        ticks: {
+          color: '#999',
+          maxRotation: 55,
+          minRotation: 55,
+          callback: function(value) {
+            const d = new Date(value);
+            return d.toLocaleString('uk-UA', {
+              day: '2-digit',
+              month: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit'
+            });
+          }
+        },
+        grid: {
+          color: 'rgba(255,255,255,0.05)'
+        }
+      },
+      y: {
+        position: 'left',
+        title: {
+          display: true,
+          text: 'Вт',
+          color: '#aaa'
+        },
+        ticks: {
+          color: '#999'
+        },
+        grid: {
+          color: 'rgba(255,255,255,0.05)'
+        }
+      },
+      y1: {
+        position: 'right',
+        min: 0,
+        max: 100,
+        title: {
+          display: true,
+          text: '%',
+          color: '#aaa'
+        },
+        ticks: {
+          color: '#999'
+        },
+        grid: {
+          drawOnChartArea: false
+        }
+      }
+    }
+  }
+});
+
+let currentDataRange = null;
+let autoRefreshTimer = null;
+
+function getRange() {
+  const days = parseInt(document.getElementById('range').value, 10);
+  let start, end;
+
+  if (days === 1) {
+    start = new Date();
+    start.setHours(0, 0, 0, 0);
+
+    end = new Date(); // до поточного моменту
+  } else {
+    end = new Date();
+    end.setHours(23, 59, 59, 999);
+
+    start = new Date(end);
+    start.setDate(start.getDate() - (days - 1));
+    start.setHours(0, 0, 0, 0);
+  }
+
+  return {
+    days,
+    from: Math.floor(start.getTime() / 1000),
+    to: Math.floor(end.getTime() / 1000)
+  };
+}
+
+function getStep(days) {
+  if (days === 1) return 60;       // 1 хв
+  if (days === 7) return 300;      // 5 хв
+  if (days === 30) return 900;     // 15 хв
+  return 3600;                     // 1 година
+}
+
+function aggregateWindow(points) {
+  if (!points.length) {
+    return { pv: 0, load: 0, soc: 0, hasData: false };
+  }
+
+  let pvSum = 0;
+  let loadSum = 0;
+  let socSum = 0;
+
+  for (const p of points) {
+    pvSum += p.pv;
+    loadSum += p.load;
+    socSum += p.soc;
+  }
+
+  return {
+    pv: pvSum / points.length,
+    load: loadSum / points.length,
+    soc: socSum / points.length,
+    hasData: true
+  };
+}
+
+function buildSeries(rawData, rangeInfo) {
+  const step = getStep(rangeInfo.days);
+
+  const pvSeries = [];
+  const loadSeries = [];
+  const socSeries = [];
+
+  let index = 0;
+  rawData.sort((a, b) => a.ts - b.ts);
+
+  for (let t = rangeInfo.from; t <= rangeInfo.to; t += step) {
+    const windowStart = t;
+    const windowEnd = t + step;
+
+    const bucket = [];
+
+    while (index < rawData.length && rawData[index].ts < windowEnd) {
+      if (rawData[index].ts >= windowStart) {
+        bucket.push(rawData[index]);
+      }
+      index++;
+    }
+
+    const agg = aggregateWindow(bucket);
+    const x = t * 1000;
+
+    pvSeries.push({ x, y: agg.hasData ? agg.pv : 0 });
+    loadSeries.push({ x, y: agg.hasData ? agg.load : 0 });
+    socSeries.push({ x, y: agg.hasData ? agg.soc : 0 });
+  }
+
+  return { pvSeries, loadSeries, socSeries };
+}
+
+function applyLast5HoursWindow() {
+  if (!currentDataRange) return;
+
+  const nowMs = Date.now();
+  const fiveHoursAgoMs = nowMs - (5 * 60 * 60 * 1000);
+
+  const min = Math.max(fiveHoursAgoMs, currentDataRange.minMs);
+  const max = Math.min(nowMs, currentDataRange.maxMs);
+
+  chart.options.scales.x.min = min;
+  chart.options.scales.x.max = max > min ? max : currentDataRange.maxMs;
+  chart.update('none');
+}
+
+function resetZoomFullRange() {
+  if (!currentDataRange) return;
+
+  chart.resetZoom();
+  chart.options.scales.x.min = currentDataRange.minMs;
+  chart.options.scales.x.max = currentDataRange.maxMs;
+  chart.update('none');
+}
+
+async function loadData(keepWindow = true) {
+  const previousMin = chart.options.scales.x.min;
+  const previousMax = chart.options.scales.x.max;
+
+  const rangeInfo = getRange();
+  const res = await fetch(`${SERVER_URL}?from=${rangeInfo.from}&to=${rangeInfo.to}`);
+  const rawData = await res.json();
+
+  const { pvSeries, loadSeries, socSeries } = buildSeries(rawData, rangeInfo);
+
+  chart.data.datasets[0].data = pvSeries;
+  chart.data.datasets[1].data = loadSeries;
+  chart.data.datasets[2].data = socSeries;
+
+  currentDataRange = {
+    minMs: rangeInfo.from * 1000,
+    maxMs: rangeInfo.to * 1000
+  };
+
+  if (keepWindow && previousMin != null && previousMax != null) {
+    chart.options.scales.x.min = previousMin;
+    chart.options.scales.x.max = previousMax;
+  } else {
+    applyLast5HoursWindow();
+  }
+
+  chart.update('none');
+}
+
+function restartAutoRefresh() {
+  if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+  autoRefreshTimer = setInterval(() => loadData(true), 60000);
+}
+
+document.getElementById('range').addEventListener('change', async () => {
+  await loadData(false);
+});
+
+document.getElementById('btnLast5h').addEventListener('click', () => {
+  applyLast5HoursWindow();
+});
+
+document.getElementById('btnResetZoom').addEventListener('click', () => {
+  resetZoomFullRange();
+});
+
+(async function init() {
+  await loadData(false);
+  restartAutoRefresh();
+})();
+</script>
+
+</body>
+</html>
