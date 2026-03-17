@@ -1,0 +1,27 @@
+
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.example.httpserver'
+    compileSdk 30
+
+    defaultConfig {
+        applicationId "com.example.httpserver"
+        minSdk 19
+        targetSdk 30
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        debug {
+            debuggable true
+        }
+    }
+}
+
+dependencies {
+    implementation 'org.nanohttpd:nanohttpd:2.3.1'
+}
