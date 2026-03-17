@@ -28,11 +28,14 @@ jobs:
           sdkmanager "platforms;android-30"
           sdkmanager "build-tools;30.0.3"
 
-      - name: Grant execute permission
-        run: chmod +x gradlew
+      - name: Install Gradle 7.2
+        run: |
+          wget https://services.gradle.org/distributions/gradle-7.2-bin.zip
+          unzip gradle-7.2-bin.zip
+          echo "$PWD/gradle-7.2/bin" >> $GITHUB_PATH
 
       - name: Build APK
-        run: ./gradlew assembleDebug
+        run: gradle assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
