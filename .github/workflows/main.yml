@@ -28,11 +28,11 @@ jobs:
           sdkmanager "platforms;android-30"
           sdkmanager "build-tools;30.0.3"
 
-      - name: Install Gradle 7.2
+      - name: Install Gradle 8.2
         run: |
-          wget https://services.gradle.org/distributions/gradle-7.2-bin.zip
-          unzip gradle-7.2-bin.zip
-          echo "$PWD/gradle-7.2/bin" >> $GITHUB_PATH
+          wget https://services.gradle.org/distributions/gradle-8.2-bin.zip
+          unzip gradle-8.2-bin.zip
+          echo "$PWD/gradle-8.2/bin" >> $GITHUB_PATH
 
       - name: Build APK
         run: gradle assembleDebug
