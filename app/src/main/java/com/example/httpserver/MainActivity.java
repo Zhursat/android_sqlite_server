@@ -7,9 +7,10 @@ import android.widget.TextView;
 import fi.iki.elonen.NanoHTTPD;
 
 import android.database.sqlite.*;
-import android.database.Cursor;   // ← ВАЖЛИВО (ось це не вистачало)
+import android.database.Cursor;
 import android.content.*;
 
+import java.io.InputStream;
 import java.io.IOException;
 import java.util.*;
 
@@ -56,6 +57,24 @@ public class MainActivity extends Activity {
                     return r;
                 }
 
+                // ===== HTML (ГОЛОВНА СТОРІНКА) =====
+                if(Method.GET.equals(session.getMethod()) &&
+                   "/".equals(session.getUri())){
+
+                    try {
+                        InputStream is = getAssets().open("graph.html");
+                        Scanner s = new Scanner(is).useDelimiter("\\A");
+                        String html = s.hasNext() ? s.next() : "";
+
+                        Response r = newFixedLengthResponse(Response.Status.OK, "text/html", html);
+                        addCors(r);
+                        return r;
+
+                    } catch (Exception e) {
+                        return newFixedLengthResponse("ERR loading HTML");
+                    }
+                }
+
                 // ===== POST =====
                 if(Method.POST.equals(session.getMethod()) &&
                    "/api/telemetry".equals(session.getUri())){
@@ -86,7 +105,7 @@ public class MainActivity extends Activity {
                     return r;
                 }
 
-                // ===== GET =====
+                // ===== GET HISTORY =====
                 if(Method.GET.equals(session.getMethod()) &&
                    "/api/history".equals(session.getUri())){
 
@@ -129,7 +148,7 @@ public class MainActivity extends Activity {
                     return r;
                 }
 
-                Response r = newFixedLengthResponse("Server running");
+                Response r = newFixedLengthResponse("OK");
                 addCors(r);
                 return r;
 
