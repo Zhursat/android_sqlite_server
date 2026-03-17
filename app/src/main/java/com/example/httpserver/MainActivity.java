@@ -7,6 +7,7 @@ import android.widget.TextView;
 import fi.iki.elonen.NanoHTTPD;
 
 import android.database.sqlite.*;
+import android.database.Cursor;   // ← ВАЖЛИВО (ось це не вистачало)
 import android.content.*;
 
 import java.io.IOException;
@@ -49,14 +50,13 @@ public class MainActivity extends Activity {
         public Response serve(IHTTPSession session){
             try{
 
-                // ===== CORS preflight =====
                 if(Method.OPTIONS.equals(session.getMethod())){
                     Response r = newFixedLengthResponse("");
                     addCors(r);
                     return r;
                 }
 
-                // ===== POST telemetry =====
+                // ===== POST =====
                 if(Method.POST.equals(session.getMethod()) &&
                    "/api/telemetry".equals(session.getUri())){
 
@@ -86,7 +86,7 @@ public class MainActivity extends Activity {
                     return r;
                 }
 
-                // ===== GET history =====
+                // ===== GET =====
                 if(Method.GET.equals(session.getMethod()) &&
                    "/api/history".equals(session.getUri())){
 
@@ -129,7 +129,6 @@ public class MainActivity extends Activity {
                     return r;
                 }
 
-                // ===== default =====
                 Response r = newFixedLengthResponse("Server running");
                 addCors(r);
                 return r;
@@ -141,7 +140,6 @@ public class MainActivity extends Activity {
             }
         }
 
-        // ===== JSON parser =====
         private double get(String j,String k){
             try{
                 String s="\""+k+"\"";
@@ -156,7 +154,6 @@ public class MainActivity extends Activity {
             }catch(Exception ex){return 0;}
         }
 
-        // ===== CORS =====
         private void addCors(Response r){
             r.addHeader("Access-Control-Allow-Origin","*");
             r.addHeader("Access-Control-Allow-Methods","GET,POST,OPTIONS");
