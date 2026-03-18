@@ -4,13 +4,9 @@ import android.app.Service;
 import android.content.Intent;
 import android.os.IBinder;
 
-import fi.iki.elonen.NanoHTTPD;
-
-import java.io.IOException;
-
 public class ServerService extends Service {
 
-    private NanoHTTPD server;
+    private MyServer server;
 
     @Override
     public void onCreate() {
@@ -18,9 +14,9 @@ public class ServerService extends Service {
 
         new Thread(() -> {
             try {
-                server = new MainActivity().new MyServer();
+                server = new MyServer(getApplicationContext());
                 server.start();
-            } catch (IOException e) {
+            } catch (Exception e) {
                 e.printStackTrace();
             }
         }).start();
