@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <TextView
+            android:text="Server Status"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+
+        <TextView android:id="@+id/txtCount" android:text="Записів: -" android:textSize="18sp"/>
+        <TextView android:id="@+id/txtDbSize" android:text="Розмір БД: -" android:textSize="18sp"/>
+
+        <TextView
+            android:text="Останні дані:"
+            android:textStyle="bold"
+            android:layout_marginTop="16dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+
+        <TextView android:id="@+id/txtPV" android:text="PV: -"/>
+        <TextView android:id="@+id/txtLoad" android:text="Load: -"/>
+        <TextView android:id="@+id/txtSOC" android:text="SOC: -"/>
+        <TextView android:id="@+id/txtTime" android:text="Час: -"/>
+
+        <Button
+            android:id="@+id/btnClear"
+            android:text="Очистити базу"
+            android:layout_marginTop="20dp"/>
+
+    </LinearLayout>
+</ScrollView>
