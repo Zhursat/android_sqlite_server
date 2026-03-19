@@ -14,7 +14,18 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginBottom="12dp"/>
+    <Button
+        android:id="@+id/btnRestore"
+        android:text="🔁 Відновити з backup"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
 
+    <Button
+        android:id="@+id/btnClear"
+        android:text="🧹 Очистити БД"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+    
     <Button
         android:id="@+id/btnRestart"
         android:text="♻ Перезапуск сервера"
