@@ -380,7 +380,7 @@ async function loadData(keepWindow = true) {
 
 function restartAutoRefresh() {
   if (autoRefreshTimer) clearInterval(autoRefreshTimer);
-  autoRefreshTimer = setInterval(() => loadData(true), 60000);
+  autoRefreshTimer = setInterval(() => loadData(true), 5000);
 }
 
 document.getElementById('range').addEventListener('change', async () => {
