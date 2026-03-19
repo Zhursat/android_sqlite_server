@@ -20,7 +20,7 @@
 
         <!-- НОВИЙ UI -->
         <activity android:name=".ControlActivity"/>
-
+            
         <!-- СЕРВІС -->
         <service android:name=".ServerService"/>
 
