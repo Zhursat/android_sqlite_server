@@ -4,12 +4,13 @@
     <!-- дозволи -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
 
     <application
         android:icon="@mipmap/ic_launcher"
-        android:label="Solar Monitor">
+        android:label="JSD Solar History Monitor">
 
-        <!-- UI -->
+        <!-- ГОЛОВНА -->
         <activity android:name=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
@@ -17,10 +18,13 @@
             </intent-filter>
         </activity>
 
-        <!-- 🔥 СЕРВІС (наш сервер) -->
+        <!-- НОВИЙ UI -->
+        <activity android:name=".ControlActivity"/>
+
+        <!-- СЕРВІС -->
         <service android:name=".ServerService"/>
 
-        <!-- 🔥 АВТОЗАПУСК -->
+        <!-- АВТОЗАПУСК -->
         <receiver
             android:name=".BootReceiver"
             android:enabled="true"
