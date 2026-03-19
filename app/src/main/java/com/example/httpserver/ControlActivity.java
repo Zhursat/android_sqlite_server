@@ -1,3 +1,17 @@
+package com.example.httpserver;
+
+import android.app.Activity;
+import android.os.Bundle;
+import android.os.Environment;
+import android.widget.Toast;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+
 public class ControlActivity extends Activity {
 
     @Override
