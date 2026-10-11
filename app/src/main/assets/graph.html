@@ -236,6 +236,10 @@ const chart = new Chart(document.getElementById('chart').getContext('2d'), {
 
 let currentDataRange = null;
 let autoRefreshTimer = null;
+let loadedRange = null;
+let lastRefreshAt = null;
+let activeRequest = null;
+let requestVersion = 0;
 
 function getRange() {
   const days = parseInt(document.getElementById('range').value, 10);
@@ -309,43 +313,137 @@ function resetZoomFullRange() {
 }
 
 async function loadData(keepWindow = true) {
-  const previousMin = chart.options.scales.x.min;
-  const previousMax = chart.options.scales.x.max;
+  const version = ++requestVersion;
+  if (activeRequest) activeRequest.abort();
+  const controller = new AbortController();
+  activeRequest = controller;
+  const startedAt = Math.floor(Date.now() / 1000);
+
+  try {
+    const previousMin = chart.options.scales.x.min;
+    const previousMax = chart.options.scales.x.max;
+    const rangeInfo = getRange();
+    const step = getStep(rangeInfo.days);
+    const res = await fetch(`${SERVER_URL}?from=${rangeInfo.from}&to=${rangeInfo.to}&step=${step}`,
+                            { signal: controller.signal });
+    if (!res.ok) throw new Error(`History request failed: ${res.status}`);
+
+    const averagedData = await res.json();
+    if (version !== requestVersion) return;
+
+    const { pvSeries, loadSeries, socSeries } = buildSeries(averagedData);
+    chart.data.datasets[0].data = pvSeries;
+    chart.data.datasets[1].data = loadSeries;
+    chart.data.datasets[2].data = socSeries;
+
+    loadedRange = { ...rangeInfo, step };
+    lastRefreshAt = startedAt;
+    currentDataRange = {
+      minMs: rangeInfo.from * 1000,
+      maxMs: rangeInfo.to * 1000
+    };
+
+    if (keepWindow && previousMin != null && previousMax != null) {
+      chart.options.scales.x.min = previousMin;
+      chart.options.scales.x.max = previousMax;
+      chart.update('none');
+    } else {
+      applyLast5HoursWindow();
+    }
+  } catch (error) {
+    if (error.name !== 'AbortError') console.error('History load failed:', error);
+  } finally {
+    if (activeRequest === controller) activeRequest = null;
+  }
+}
+
+// Refresh only the buckets that may have changed since our last query.
+// On a new calendar day or another date-range change, reload the full range.
+async function refreshLatestBuckets() {
+  if (document.hidden || activeRequest) return;
 
   const rangeInfo = getRange();
-  const step = getStep(rangeInfo.days);
-  const res = await fetch(`${SERVER_URL}?from=${rangeInfo.from}&to=${rangeInfo.to}&step=${step}`);
-  if (!res.ok) throw new Error(`History request failed: ${res.status}`);
-  const averagedData = await res.json();
-
-  const { pvSeries, loadSeries, socSeries } = buildSeries(averagedData);
-
-  chart.data.datasets[0].data = pvSeries;
-  chart.data.datasets[1].data = loadSeries;
-  chart.data.datasets[2].data = socSeries;
-
-  currentDataRange = {
-    minMs: rangeInfo.from * 1000,
-    maxMs: rangeInfo.to * 1000
-  };
-
-  if (keepWindow && previousMin != null && previousMax != null) {
-    chart.options.scales.x.min = previousMin;
-    chart.options.scales.x.max = previousMax;
-  } else {
-    applyLast5HoursWindow();
+  if (!loadedRange ||
+      loadedRange.days !== rangeInfo.days ||
+      loadedRange.from !== rangeInfo.from ||
+      rangeInfo.to < loadedRange.to ||
+      lastRefreshAt == null) {
+    await loadData(false);
+    return;
   }
 
-  chart.update('none');
+  const to = Math.min(Math.floor(Date.now() / 1000), rangeInfo.to);
+  if (to < lastRefreshAt) {
+    await loadData(true);
+    return;
+  }
+
+  const step = loadedRange.step;
+  const firstBucket = Math.max(0, Math.floor((lastRefreshAt - rangeInfo.from) / step));
+  const from = rangeInfo.from + firstBucket * step;
+  if (from > to) return;
+
+  const controller = new AbortController();
+  const version = requestVersion;
+  activeRequest = controller;
+
+  try {
+    const res = await fetch(`${SERVER_URL}?from=${from}&to=${to}&step=${step}`,
+                            { signal: controller.signal });
+    if (!res.ok) throw new Error(`History refresh failed: ${res.status}`);
+
+    const updates = await res.json();
+    if (version !== requestVersion) return;
+
+    const datasets = chart.data.datasets;
+    for (const point of updates) {
+      const index = (point.ts - rangeInfo.from) / step;
+      if (!Number.isInteger(index) || index < 0 || index >= 10000) continue;
+
+      // Today grows by one point as a new minute begins; longer ranges
+      // already contain the empty future buckets and need replacements only.
+      while (datasets[0].data.length <= index) {
+        const x = (rangeInfo.from + datasets[0].data.length * step) * 1000;
+        for (const dataset of datasets) dataset.data.push({ x, y: 0 });
+      }
+
+      const x = point.ts * 1000;
+      datasets[0].data[index] = { x, y: point.pv };
+      datasets[1].data[index] = { x, y: point.load };
+      datasets[2].data[index] = { x, y: point.soc };
+    }
+
+    loadedRange.to = rangeInfo.to;
+    lastRefreshAt = to;
+    currentDataRange.maxMs = rangeInfo.to * 1000;
+    chart.update('none');
+  } catch (error) {
+    if (error.name !== 'AbortError') console.error('History refresh failed:', error);
+  } finally {
+    if (activeRequest === controller) activeRequest = null;
+  }
+}
+
+function getRefreshPeriod(days) {
+  if (days === 1) return 5000;
+  if (days === 7) return 30000;
+  if (days === 30) return 60000;
+  return 300000;
 }
 
 function restartAutoRefresh() {
   if (autoRefreshTimer) clearInterval(autoRefreshTimer);
-  autoRefreshTimer = setInterval(() => loadData(true), 5000);
+  autoRefreshTimer = setInterval(refreshLatestBuckets,
+    getRefreshPeriod(getRange().days));
 }
 
-document.getElementById('range').addEventListener('change', async () => {
-  await loadData(false);
+document.getElementById('range').addEventListener('change', () => {
+  restartAutoRefresh();
+  loadData(false);
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) refreshLatestBuckets();
 });
 
 document.getElementById('btnLast5h').addEventListener('click', () => {
