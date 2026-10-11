@@ -269,58 +269,17 @@ function getStep(days) {
   return 3600;                     // 1 година
 }
 
-function aggregateWindow(points) {
-  if (!points.length) {
-    return { pv: 0, load: 0, soc: 0, hasData: false };
-  }
-
-  let pvSum = 0;
-  let loadSum = 0;
-  let socSum = 0;
-
-  for (const p of points) {
-    pvSum += p.pv;
-    loadSum += p.load;
-    socSum += p.soc;
-  }
-
-  return {
-    pv: pvSum / points.length,
-    load: loadSum / points.length,
-    soc: socSum / points.length,
-    hasData: true
-  };
-}
-
-function buildSeries(rawData, rangeInfo) {
-  const step = getStep(rangeInfo.days);
-
+// The server already returns equally spaced averages (including empty buckets).
+function buildSeries(averagedData) {
   const pvSeries = [];
   const loadSeries = [];
   const socSeries = [];
 
-  let index = 0;
-  rawData.sort((a, b) => a.ts - b.ts);
-
-  for (let t = rangeInfo.from; t <= rangeInfo.to; t += step) {
-    const windowStart = t;
-    const windowEnd = t + step;
-
-    const bucket = [];
-
-    while (index < rawData.length && rawData[index].ts < windowEnd) {
-      if (rawData[index].ts >= windowStart) {
-        bucket.push(rawData[index]);
-      }
-      index++;
-    }
-
-    const agg = aggregateWindow(bucket);
-    const x = t * 1000;
-
-    pvSeries.push({ x, y: agg.hasData ? agg.pv : 0 });
-    loadSeries.push({ x, y: agg.hasData ? agg.load : 0 });
-    socSeries.push({ x, y: agg.hasData ? agg.soc : 0 });
+  for (const p of averagedData) {
+    const x = p.ts * 1000;
+    pvSeries.push({ x, y: p.pv });
+    loadSeries.push({ x, y: p.load });
+    socSeries.push({ x, y: p.soc });
   }
 
   return { pvSeries, loadSeries, socSeries };
@@ -354,10 +313,12 @@ async function loadData(keepWindow = true) {
   const previousMax = chart.options.scales.x.max;
 
   const rangeInfo = getRange();
-  const res = await fetch(`${SERVER_URL}?from=${rangeInfo.from}&to=${rangeInfo.to}`);
-  const rawData = await res.json();
+  const step = getStep(rangeInfo.days);
+  const res = await fetch(`${SERVER_URL}?from=${rangeInfo.from}&to=${rangeInfo.to}&step=${step}`);
+  if (!res.ok) throw new Error(`History request failed: ${res.status}`);
+  const averagedData = await res.json();
 
-  const { pvSeries, loadSeries, socSeries } = buildSeries(rawData, rangeInfo);
+  const { pvSeries, loadSeries, socSeries } = buildSeries(averagedData);
 
   chart.data.datasets[0].data = pvSeries;
   chart.data.datasets[1].data = loadSeries;
