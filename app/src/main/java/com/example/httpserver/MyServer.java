@@ -73,6 +73,19 @@ public class MyServer extends NanoHTTPD {
                 long from = Long.parseLong(p.get("from"));
                 long to   = Long.parseLong(p.get("to"));
 
+                // Optional aggregation; requests without "step" keep the legacy raw response.
+                String stepValue = p.get("step");
+                if (stepValue != null) {
+                    int step;
+                    try {
+                        step = Integer.parseInt(stepValue);
+                    } catch (NumberFormatException e) {
+                        return newFixedLengthResponse(Response.Status.BAD_REQUEST,
+                                "text/plain", "Invalid step");
+                    }
+                    return aggregatedHistory(from, to, step);
+                }
+
                 SQLiteDatabase db = context.openOrCreateDatabase("solar.db", Context.MODE_PRIVATE, null);
 
                 Cursor c = db.rawQuery(
@@ -109,6 +122,61 @@ public class MyServer extends NanoHTTPD {
 
         } catch (Exception e) {
             return newFixedLengthResponse("ERR");
+        }
+    }
+
+    // Return one point per interval, including zeros for intervals without measurements.
+    // Buckets are aligned to "from", matching the previous browser implementation.
+    private Response aggregatedHistory(long from, long to, int step) {
+        if (from < 0 || to < from || step <= 0 || (to - from) / step >= 10000) {
+            return newFixedLengthResponse(Response.Status.BAD_REQUEST,
+                    "text/plain", "Invalid history range or step");
+        }
+
+        int count = (int) ((to - from) / step + 1);
+        SQLiteDatabase db = context.openOrCreateDatabase("solar.db", Context.MODE_PRIVATE, null);
+        Cursor c = null;
+
+        try {
+            c = db.rawQuery(
+                    "SELECT ((ts - ?) / ?) AS bucket, " +
+                    "AVG(pv), AVG(load), AVG(soc) " +
+                    "FROM data WHERE ts BETWEEN ? AND ? " +
+                    "GROUP BY bucket ORDER BY bucket",
+                    new String[]{String.valueOf(from), String.valueOf(step),
+                            String.valueOf(from), String.valueOf(to)}
+            );
+
+            StringBuilder json = new StringBuilder(count * 60);
+            json.append("[");
+            boolean hasRow = c.moveToFirst();
+
+            for (int i = 0; i < count; i++) {
+                double pv = 0;
+                double load = 0;
+                double soc = 0;
+
+                if (hasRow && c.getLong(0) == i) {
+                    pv = c.getDouble(1);
+                    load = c.getDouble(2);
+                    soc = c.getDouble(3);
+                    hasRow = c.moveToNext();
+                }
+
+                if (i > 0) json.append(",");
+                json.append("{")
+                        .append("\"ts\":").append(from + (long) i * step).append(",")
+                        .append("\"pv\":").append(pv).append(",")
+                        .append("\"load\":").append(load).append(",")
+                        .append("\"soc\":").append(soc)
+                        .append("}");
+            }
+
+            json.append("]");
+            return newFixedLengthResponse(Response.Status.OK, "application/json", json.toString());
+        } finally {
+            if (c != null) c.close();
+            db.close();
         }
     }
 
