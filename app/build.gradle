@@ -14,9 +14,26 @@ android {
         versionName "1.0"
     }
 
+    // When signing credentials are supplied by GitHub Actions, sign Debug APKs
+    // with the same persistent certificate so data survives subsequent updates.
+    // Keeping the build debuggable also allows run-as for the one-time DB restore.
+    signingConfigs {
+        solarDebug {
+            storeFile file(System.getenv("SOLAR_SIGNING_KEYSTORE") ?: "missing-signing-key.jks")
+            storePassword System.getenv("SOLAR_SIGNING_PASSWORD") ?: ""
+            keyAlias "solar-monitor"
+            keyPassword System.getenv("SOLAR_SIGNING_PASSWORD") ?: ""
+            storeType "PKCS12"
+        }
+    }
+
     buildTypes {
         debug {
             debuggable true
+            if (System.getenv("SOLAR_SIGNING_KEYSTORE") &&
+                    System.getenv("SOLAR_SIGNING_PASSWORD")) {
+                signingConfig signingConfigs.solarDebug
+            }
         }
     }
 }
