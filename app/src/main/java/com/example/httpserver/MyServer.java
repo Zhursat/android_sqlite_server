@@ -15,6 +15,14 @@ public class MyServer extends NanoHTTPD {
     public MyServer(Context context) {
         super(5000);
         this.context = context;
+
+        SQLiteDatabase db = context.openOrCreateDatabase("solar.db", Context.MODE_PRIVATE, null);
+        try {
+            db.execSQL("CREATE TABLE IF NOT EXISTS data(ts INTEGER,pv REAL,load REAL,soc REAL)");
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_data_ts ON data(ts)");
+        } finally {
+            db.close();
+        }
     }
 
     @Override
@@ -45,8 +53,6 @@ public class MyServer extends NanoHTTPD {
                 double soc = get(body,"soc");
 
                 SQLiteDatabase db = context.openOrCreateDatabase("solar.db", Context.MODE_PRIVATE, null);
-
-                db.execSQL("CREATE TABLE IF NOT EXISTS data(ts INTEGER,pv REAL,load REAL,soc REAL)");
 
                 db.execSQL("INSERT INTO data VALUES(?,?,?,?)",
                         new Object[]{
