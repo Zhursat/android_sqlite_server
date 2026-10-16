@@ -4,6 +4,8 @@ import fi.iki.elonen.NanoHTTPD;
 import android.content.Context;
 import android.database.sqlite.*;
 import android.database.Cursor;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.*;
 import java.util.*;
@@ -47,20 +49,42 @@ public class MyServer extends NanoHTTPD {
                 session.parseBody(files);
 
                 String body = files.get("postData");
+                if (body == null || body.trim().isEmpty()) {
+                    return newFixedLengthResponse(Response.Status.BAD_REQUEST,
+                            "text/plain", "Missing telemetry JSON");
+                }
 
-                double pv = get(body,"pv");
-                double load = get(body,"load");
-                double soc = get(body,"soc");
+                // The existing ESP32 firmware sends numeric pv/load/soc fields.
+                // Accept additional fields so future firmware can extend the payload.
+                final double pv;
+                final double load;
+                final double soc;
+                try {
+                    JSONObject telemetry = new JSONObject(body);
+                    pv = requiredNumber(telemetry, "pv");
+                    load = requiredNumber(telemetry, "load");
+                    soc = requiredNumber(telemetry, "soc");
+                } catch (JSONException e) {
+                    return newFixedLengthResponse(Response.Status.BAD_REQUEST,
+                            "text/plain", "Invalid telemetry JSON");
+                }
+
+                if (pv < 0 || load < 0 || soc < 0 || soc > 100) {
+                    return newFixedLengthResponse(Response.Status.BAD_REQUEST,
+                            "text/plain", "Telemetry values out of range");
+                }
 
                 SQLiteDatabase db = context.openOrCreateDatabase("solar.db", Context.MODE_PRIVATE, null);
-
-                db.execSQL("INSERT INTO data VALUES(?,?,?,?)",
-                        new Object[]{
-                                System.currentTimeMillis()/1000,
-                                pv, load, soc
-                        });
-
-                db.close();
+                try {
+                    // Preserve the existing database schema and legacy history API.
+                    db.execSQL("INSERT INTO data VALUES(?,?,?,?)",
+                            new Object[]{
+                                    System.currentTimeMillis()/1000,
+                                    pv, load, soc
+                            });
+                } finally {
+                    db.close();
+                }
 
                 return newFixedLengthResponse("OK");
             }
@@ -180,14 +204,16 @@ public class MyServer extends NanoHTTPD {
         }
     }
 
-    private double get(String j,String k){
-        try{
-            String s="\""+k+"\"";
-            int i=j.indexOf(s);
-            int c=j.indexOf(":",i);
-            int e=j.indexOf(",",c);
-            if(e==-1) e=j.indexOf("}",c);
-            return Double.parseDouble(j.substring(c+1,e).trim());
-        }catch(Exception ex){return 0;}
+    // Do not silently store zeros for missing, null, quoted or invalid numbers.
+    private static double requiredNumber(JSONObject json, String key) throws JSONException {
+        Object value = json.get(key);
+        if (!(value instanceof Number)) {
+            throw new JSONException("Telemetry field is not numeric: " + key);
+        }
+        double number = ((Number) value).doubleValue();
+        if (Double.isNaN(number) || Double.isInfinite(number)) {
+            throw new JSONException("Telemetry field is not finite: " + key);
+        }
+        return number;
     }
 }
