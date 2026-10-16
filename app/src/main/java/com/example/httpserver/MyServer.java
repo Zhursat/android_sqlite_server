@@ -144,6 +144,11 @@ public class MyServer extends NanoHTTPD {
             }
 
             if (Method.GET.equals(session.getMethod()) &&
+                "/api/control/status".equals(session.getUri())) {
+                return controlStatus();
+            }
+
+            if (Method.GET.equals(session.getMethod()) &&
                 "/api/telemetry/status".equals(session.getUri())) {
                 return telemetryStatus();
             }
@@ -205,6 +210,56 @@ public class MyServer extends NanoHTTPD {
 
         } catch (Exception e) {
             return newFixedLengthResponse("ERR");
+        }
+    }
+
+    // STEP 08: read-only control readiness. Never sends commands to ESP32.
+    // Only freshly received V2 telemetry can serve as current state.
+    private Response controlStatus() {
+        SQLiteDatabase db = context.openOrCreateDatabase("solar.db", Context.MODE_PRIVATE, null);
+        Cursor c = null;
+        try {
+            JSONObject result = new JSONObject();
+            result.put("commands_enabled", false);
+            result.put("source", "telemetry_v2");
+            c = db.rawQuery(
+                    "SELECT ts,payload FROM telemetry_v2 ORDER BY rowid DESC LIMIT 1",
+                    null);
+            if (!c.moveToFirst()) {
+                result.put("online", false);
+                result.put("reason", "no_telemetry");
+                result.put("control_mode", JSONObject.NULL);
+            } else {
+                long ts = c.getLong(0);
+                long age = Math.max(0, System.currentTimeMillis() / 1000L - ts);
+                JSONObject payload = new JSONObject(c.getString(1));
+                JSONObject inverter = payload.optJSONObject("inverter");
+                Object mode = inverter == null ? null : inverter.opt("control_mode");
+                boolean recognized = mode instanceof Number &&
+                        ((Number) mode).doubleValue() == ((Number) mode).intValue() &&
+                        ((Number) mode).intValue() >= 0 &&
+                        ((Number) mode).intValue() <= 2;
+                result.put("last_timestamp", ts);
+                result.put("age_seconds", age);
+                result.put("online", age <= 90);
+                result.put("control_mode", recognized ? mode : JSONObject.NULL);
+                result.put("mode_name", recognized ?
+                        new String[]{"AUTO", "PU", "PBG"}[((Number) mode).intValue()] :
+                        JSONObject.NULL);
+                result.put("reason", age > 90 ? "stale_telemetry" :
+                        recognized ? "read_only" : "unknown_mode");
+            }
+            Response response = newFixedLengthResponse(
+                    Response.Status.OK, "application/json; charset=utf-8",
+                    result.toString());
+            response.addHeader("Cache-Control", "no-store");
+            return response;
+        } catch (JSONException e) {
+            return newFixedLengthResponse(Response.Status.INTERNAL_ERROR,
+                    "text/plain", "Invalid stored telemetry");
+        } finally {
+            if (c != null) c.close();
+            db.close();
         }
     }
 
