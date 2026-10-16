@@ -143,6 +143,19 @@ public class MyServer extends NanoHTTPD {
                 return newFixedLengthResponse("OK");
             }
 
+            // STEP 09: preflight only. No request path can dispatch inverter commands.
+            if (Method.POST.equals(session.getMethod()) &&
+                "/api/control/prepare".equals(session.getUri())) {
+                return prepareControl(session);
+            }
+
+            // Explicitly deny direct mode changes until authenticated execution exists.
+            if ("/api/control/mode".equals(session.getUri())) {
+                return newFixedLengthResponse(Response.Status.FORBIDDEN,
+                        "application/json; charset=utf-8",
+                        "{\\"ok\\":false,\\"reason\\":\\"commands_disabled\\"}");
+            }
+
             if (Method.GET.equals(session.getMethod()) &&
                 "/api/control/status".equals(session.getUri())) {
                 return controlStatus();
@@ -211,6 +224,77 @@ public class MyServer extends NanoHTTPD {
         } catch (Exception e) {
             return newFixedLengthResponse("ERR");
         }
+    }
+
+    // Validate a candidate request without forwarding or storing it.
+    // The result is informational, not authorization to operate the inverter.
+    private Response prepareControl(IHTTPSession session) {
+        Map<String, String> files = new HashMap<>();
+        try {
+            session.parseBody(files);
+            String body = files.get("postData");
+            if (body == null || body.length() > 1024) {
+                return controlPreflightError(Response.Status.BAD_REQUEST, "invalid_body");
+            }
+            JSONObject request = new JSONObject(body);
+            Object proposed = request.opt("mode");
+            if (!(proposed instanceof Number) ||
+                    ((Number) proposed).doubleValue() != ((Number) proposed).intValue() ||
+                    ((Number) proposed).intValue() < 0 ||
+                    ((Number) proposed).intValue() > 2) {
+                return controlPreflightError(Response.Status.BAD_REQUEST, "invalid_mode");
+            }
+            int target = ((Number) proposed).intValue();
+            SQLiteDatabase db = context.openOrCreateDatabase("solar.db", Context.MODE_PRIVATE, null);
+            Cursor c = null;
+            try {
+                c = db.rawQuery(
+                        "SELECT ts,payload FROM telemetry_v2 ORDER BY rowid DESC LIMIT 1",
+                        null);
+                if (!c.moveToFirst()) {
+                    return controlPreflightError(Response.Status.SERVICE_UNAVAILABLE,
+                            "no_telemetry");
+                }
+                long ts = c.getLong(0);
+                long now = System.currentTimeMillis() / 1000;
+                if (ts > now + 30 || now - ts > 60) {
+                    return controlPreflightError(Response.Status.SERVICE_UNAVAILABLE,
+                            "stale_telemetry");
+                }
+                JSONObject inv = new JSONObject(c.getString(1)).optJSONObject("inverter");
+                Object current = inv == null ? null : inv.opt("control_mode");
+                if (!(current instanceof Number) ||
+                        ((Number) current).doubleValue() != ((Number) current).intValue() ||
+                        ((Number) current).intValue() < 0 ||
+                        ((Number) current).intValue() > 2) {
+                    return controlPreflightError(Response.Status.SERVICE_UNAVAILABLE,
+                            "unknown_current_mode");
+                }
+                JSONObject reply = new JSONObject();
+                reply.put("ok", true);
+                reply.put("dry_run", true);
+                reply.put("commands_enabled", false);
+                reply.put("requested_mode", target);
+                reply.put("current_mode", ((Number) current).intValue());
+                reply.put("change_required", target != ((Number) current).intValue());
+                reply.put("reason", "preflight_only");
+                Response response = newFixedLengthResponse(Response.Status.OK,
+                        "application/json; charset=utf-8", reply.toString());
+                response.addHeader("Cache-Control", "no-store");
+                return response;
+            } finally {
+                if (c != null) c.close();
+                db.close();
+            }
+        } catch (Exception e) {
+            return controlPreflightError(Response.Status.BAD_REQUEST, "invalid_request");
+        }
+    }
+
+    private Response controlPreflightError(Response.Status code, String reason) {
+        return newFixedLengthResponse(code, "application/json; charset=utf-8",
+                "{\\"ok\\":false,\\"dry_run\\":true,\\"commands_enabled\\":false,\\"reason\\":\\""
+                        + reason + "\\"}");
     }
 
     // STEP 08: read-only control readiness. Never sends commands to ESP32.
