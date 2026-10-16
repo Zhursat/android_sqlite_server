@@ -22,6 +22,10 @@ public class MyServer extends NanoHTTPD {
         try {
             db.execSQL("CREATE TABLE IF NOT EXISTS data(ts INTEGER,pv REAL,load REAL,soc REAL)");
             db.execSQL("CREATE INDEX IF NOT EXISTS idx_data_ts ON data(ts)");
+            // V2 records are stored separately; the legacy data table is unchanged.
+            // JSON retains all ESP32 fields without a destructive schema migration.
+            db.execSQL("CREATE TABLE IF NOT EXISTS telemetry_v2(ts INTEGER NOT NULL, payload TEXT NOT NULL)");
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_telemetry_v2_ts ON telemetry_v2(ts)");
         } finally {
             db.close();
         }
@@ -59,11 +63,25 @@ public class MyServer extends NanoHTTPD {
                 final double pv;
                 final double load;
                 final double soc;
+                final JSONObject telemetry;
+                final boolean isV2;
                 try {
-                    JSONObject telemetry = new JSONObject(body);
+                    telemetry = new JSONObject(body);
                     pv = requiredNumber(telemetry, "pv");
                     load = requiredNumber(telemetry, "load");
                     soc = requiredNumber(telemetry, "soc");
+                    // Version is opt-in; existing ESP32 firmware sends no version.
+                    if (telemetry.has("version")) {
+                        Object version = telemetry.get("version");
+                        if (!(version instanceof Number) ||
+                                ((Number) version).intValue() != 2 ||
+                                ((Number) version).doubleValue() != 2.0) {
+                            throw new JSONException("Unsupported telemetry version");
+                        }
+                        isV2 = true;
+                    } else {
+                        isV2 = false;
+                    }
                 } catch (JSONException e) {
                     return newFixedLengthResponse(Response.Status.BAD_REQUEST,
                             "text/plain", "Invalid telemetry JSON");
@@ -76,12 +94,22 @@ public class MyServer extends NanoHTTPD {
 
                 SQLiteDatabase db = context.openOrCreateDatabase("solar.db", Context.MODE_PRIVATE, null);
                 try {
-                    // Preserve the existing database schema and legacy history API.
-                    db.execSQL("INSERT INTO data VALUES(?,?,?,?)",
-                            new Object[]{
-                                    System.currentTimeMillis()/1000,
-                                    pv, load, soc
-                            });
+                    db.beginTransaction();
+                    try {
+                        long timestamp = System.currentTimeMillis() / 1000;
+                        // Every POST remains visible to the original history graph.
+                        db.execSQL("INSERT INTO data VALUES(?,?,?,?)",
+                                new Object[]{timestamp, pv, load, soc});
+                        // V2 keeps the complete payload for future dashboards and BMS metrics.
+                        // Old (unversioned) POSTs do not grow the V2 table.
+                        if (isV2) {
+                            db.execSQL("INSERT INTO telemetry_v2(ts,payload) VALUES(?,?)",
+                                    new Object[]{timestamp, telemetry.toString()});
+                        }
+                        db.setTransactionSuccessful();
+                    } finally {
+                        db.endTransaction();
+                    }
                 } finally {
                     db.close();
                 }
