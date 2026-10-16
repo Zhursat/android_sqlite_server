@@ -153,7 +153,7 @@ public class MyServer extends NanoHTTPD {
             if ("/api/control/mode".equals(session.getUri())) {
                 return newFixedLengthResponse(Response.Status.FORBIDDEN,
                         "application/json; charset=utf-8",
-                        "{\\"ok\\":false,\\"reason\\":\\"commands_disabled\\"}");
+                        "{\"ok\":false,\"reason\":\"commands_disabled\"}");
             }
 
             if (Method.GET.equals(session.getMethod()) &&
@@ -293,8 +293,8 @@ public class MyServer extends NanoHTTPD {
 
     private Response controlPreflightError(Response.Status code, String reason) {
         return newFixedLengthResponse(code, "application/json; charset=utf-8",
-                "{\\"ok\\":false,\\"dry_run\\":true,\\"commands_enabled\\":false,\\"reason\\":\\""
-                        + reason + "\\"}");
+                "{\"ok\":false,\"dry_run\":true,\"commands_enabled\":false,\"reason\":\""
+                        + reason + "\"}");
     }
 
     // STEP 08: read-only control readiness. Never sends commands to ESP32.
