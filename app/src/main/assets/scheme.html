@@ -1,0 +1,67 @@
+<!doctype html><html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Solar Monitor PRO 2.0 — схема V34g</title>
+<style>
+:root{--green:#00ff88;--yellow:#ffd400;--red:#ff3333;color-scheme:dark}
+*{box-sizing:border-box}body{background:#050505;color:#eee;font-family:Arial,sans-serif;margin:0}
+.header{display:flex;align-items:center;justify-content:center;gap:15px;flex-wrap:wrap;margin:9px}.header svg{width:240px;height:66px}.header h1{font-size:23px}
+.nav{text-align:center;margin:10px}.nav a{display:inline-block;border:1px solid var(--green);border-radius:8px;color:var(--yellow);text-decoration:none;margin:3px;padding:10px 20px}
+.note{text-align:center;color:#777;font-size:12px}.schemeScroll{max-width:100%;overflow-x:auto}.wrap{width:min(1500px,98vw);margin:14px auto}
+.scheme{position:relative;width:100%;aspect-ratio:16/9;min-width:950px;min-height:535px;background:#050505;border-radius:12px;overflow:hidden}
+.node{position:absolute;background:#111;border:4px solid var(--green);border-radius:22px;padding:12px;z-index:3;box-shadow:0 0 12px #00ff882b}
+.title{text-align:center;color:var(--green);font-size:18px;font-weight:900;letter-spacing:2px;margin-bottom:5px;text-transform:uppercase}
+.icon{position:absolute;left:7%;top:26%;width:26%;height:52%}.icon svg{width:100%;height:100%;stroke:var(--yellow);fill:none;stroke-width:5;stroke-linecap:round;stroke-linejoin:round}
+.data{position:absolute;left:42%;top:28%;right:6%;font-size:clamp(11px,1vw,16px)}.data .r{display:flex;justify-content:space-between;margin:9px 0;gap:6px}.v{color:var(--yellow);font-weight:900;white-space:nowrap}.u{color:#ddd}
+.grid{left:3%;top:4%;width:31%;height:24%}.pv{left:3%;top:36%;width:31%;height:25%}.bat{left:3%;top:70.5%;width:31%;height:22.5%}.inv{left:43%;top:29%;width:27%;height:43%}.load{left:79%;top:29%;width:18%;height:43%}
+.inv .logo{font-size:clamp(22px,2.5vw,35px);color:#13aa51;font-weight:900;text-align:center;margin-top:7%}.inv .logo span{color:#ff8a00}.inv .sub{text-align:center;color:#bbb;font-size:14px}.inv .data{top:47%;left:8%;right:8%}
+.load .icon{left:24%;top:12%;width:52%;height:36%}.load .data{top:57%;left:8%;right:8%;text-align:center}.load .data .r{justify-content:center}
+.lines{position:absolute;inset:0;width:100%;height:100%;z-index:1}.flow{fill:none;stroke:var(--green);stroke-width:5;stroke-linecap:round;opacity:.18}.flow.on{opacity:1;stroke-dasharray:13 14;animation:move 1.4s linear infinite;filter:drop-shadow(0 0 4px var(--green))}.flow.red{stroke:var(--red)}.flow.red.on{animation-direction:reverse;filter:drop-shadow(0 0 4px var(--red))}.arrow{fill:var(--green);opacity:.18}.arrow.on{opacity:1}.arrow.red{fill:var(--red)}.hide{display:none!important}
+@keyframes move{to{stroke-dashoffset:-54}}.status{position:absolute;right:1%;top:1%;z-index:4;font-size:12px;color:#aaa}.generation{position:absolute;bottom:1%;left:42%;color:var(--yellow);font-size:13px}
+.seg{fill:#282828;stroke:#666;stroke-width:1}.seg.on{fill:var(--green)}.seg.low{fill:var(--red)}.footer{text-align:center;color:#888;font-size:12px;margin:10px}
+@media(max-width:1000px){.wrap{width:100%}.scheme{width:1100px;min-width:1100px}.note{display:block}}
+</style></head><body>
+<div class="header"><svg viewBox="0 0 300 80"><ellipse cx="120" cy="40" rx="110" ry="35" fill="none" stroke="#ff7700" stroke-width="4" stroke-dasharray="200 100" transform="rotate(-10 120 40)"/><text x="120" y="55" font-family="Arial Black,sans-serif" font-size="42" fill="#ff7700" text-anchor="middle">jsdsolar</text><circle cx="255" cy="25" r="12" fill="none" stroke="#ff7700" stroke-width="2"/><text x="255" y="30" font-size="12" fill="#ff7700" text-anchor="middle">R</text></svg><h1>Моніторинг домашньої системи</h1></div>
+<div class="nav"><a href="/scheme">Головна</a><a href="/">Історія</a><a href="/dashboard">Детальні показники</a></div>
+<div class="note">Схема відтворює розташування оригінальної V34g. На телефоні її можна прокручувати горизонтально. Тільки перегляд.</div>
+<div class="schemeScroll"><div class="wrap"><div class="scheme">
+<svg class="lines" viewBox="0 0 1600 900" preserveAspectRatio="none" aria-hidden="true">
+<path id="line_grid_inv" class="flow" d="M545 175 H765 V290"/><polygon id="arr_grid_inv" class="arrow" points="765,290 755,272 775,272"/>
+<path id="line_grid_load" class="flow hide" d="M545 120 H1290 V265"/><polygon id="arr_grid_load" class="arrow hide" points="1290,265 1280,247 1300,247"/>
+<path id="line_pv_inv" class="flow" d="M545 435 H765"/><polygon id="arr_pv_inv" class="arrow" points="765,435 747,425 747,445"/>
+<path id="line_inv_load" class="flow" d="M1120 440 H1290"/><polygon id="arr_inv_load" class="arrow" points="1290,440 1272,430 1272,450"/>
+<path id="line_bat_chg" class="flow" d="M930 650 V820 H545"/><polygon id="arr_bat_chg" class="arrow" points="545,820 563,810 563,830"/>
+<path id="line_bat_dis" class="flow red" d="M545 770 H1000 V650"/><polygon id="arr_bat_dis" class="arrow red" points="1000,650 990,670 1010,670"/>
+<text x="660" y="882" id="bat_direction" fill="#ff3333" font-size="27" font-weight="bold"></text>
+</svg>
+<div class="node grid"><div class="title">Мережа</div><div class="icon"><svg viewBox="0 0 120 180"><path d="M60 4 L50 22 H70 Z M60 22 V160 M44 22 L30 160 M76 22 L90 160 M34 46 H86 M22 52 H98 M28 52 V72 M92 52 V72 M32 82 H88 M18 88 H102 M24 88 V108 M96 88 V108 M28 118 H92 M14 124 H106 M20 124 V144 M100 124 V144 M48 38 L72 70 M72 38 L48 70"/></svg></div><div class="data"><div class="r"><span>Напруга:</span><span class="v"><span id="grid_v">—</span> В</span></div><div class="r"><span>Частота:</span><span class="v"><span id="grid_hz">—</span> Гц</span></div></div></div>
+<div class="node pv"><div class="title">PV панелі</div><div class="icon"><svg viewBox="0 0 160 150"><path d="M80 18 A44 44 0 0 1 124 62 M80 18 A44 44 0 0 0 36 62 M80 8 V0 M52 18 L45 4 M108 18 L115 4 M28 70 H132 L150 125 H10 Z M45 70 L35 125 M65 70 L60 125 M85 70 L90 125 M105 70 L115 125 M20 90 H140 M15 108 H145 M72 125 V142 H90 V125"/></svg></div><div class="data"><div class="r"><span>Напруга:</span><span class="v"><span id="pv_v">—</span> В</span></div><div class="r"><span>P:</span><span class="v"><span id="pv_w">—</span> Вт</span></div></div></div>
+<div class="node bat"><div class="title">Акумулятор</div><div class="icon"><svg viewBox="0 0 120 160"><rect x="25" y="22" width="70" height="120" rx="5"/><rect x="48" y="10" width="24" height="12" rx="2"/><rect class="seg" id="seg5" x="34" y="34" width="52" height="17"/><rect class="seg" id="seg4" x="34" y="55" width="52" height="17"/><rect class="seg" id="seg3" x="34" y="76" width="52" height="17"/><rect class="seg" id="seg2" x="34" y="97" width="52" height="17"/><rect class="seg" id="seg1" x="34" y="118" width="52" height="17"/></svg></div><div class="data"><div class="r"><span>SOC:</span><span class="v"><span id="bat_soc">—</span> %</span></div><div class="r"><span>Напруга:</span><span class="v"><span id="bat_v">—</span> В</span></div><div class="r"><span>Потужність:</span><span class="v"><span id="bat_w">—</span> Вт</span></div><div class="r"><span>Струм:</span><span class="v"><span id="bat_a">—</span> А</span></div></div></div>
+<div class="node inv"><div class="logo">JSD<span>solar</span></div><div class="sub">Інвертор</div><div class="data"><div class="r"><span>Режим:</span><span class="v" id="mode_txt">—</span></div><div class="r"><span>Потужність:</span><span class="v"><span id="inv_w">—</span> Вт</span></div><div class="r"><span>Температура:</span><span class="v"><span id="inv_temp">—</span> °C</span></div><div class="r"><span>Навантаження:</span><span class="v"><span id="inv_load_pct">—</span> %</span></div></div></div>
+<div class="node load"><div class="icon"><svg viewBox="0 0 120 100"><path d="M15 48 L60 10 L105 48 M28 45 V92 H92 V45 M48 92 V62 H72 V92 M48 48 H72 V28 H48 Z"/></svg></div><div class="title">Навантаження</div><div class="data"><div class="r"><span class="v"><span id="load_v">—</span> В</span></div><div class="r"><span class="v"><span id="load_w">—</span> Вт</span></div></div></div>
+<div class="status" id="status">Очікування телеметрії...</div>
+<div class="generation">Генерація: добова <span id="gen_day">—</span> кВт·год · загальна <span id="gen_total">—</span> кВт·год</div>
+</div></div></div><div class="footer">Solar Monitor PRO 2.0 · Android · схема енергопотоків (тільки перегляд)</div>
+<script>
+const by=id=>document.getElementById(id);
+const put=(id,val,d=0)=>{by(id).textContent=typeof val==='number'&&Number.isFinite(val)?val.toFixed(d):'—'};
+const line=(id,on)=>{by('line_'+id).classList.toggle('on',!!on);by('arr_'+id).classList.toggle('on',!!on)};
+let pending=false;
+async function update(){if(pending)return;pending=true;try{
+const r=await fetch('/api/telemetry/status',{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);
+const d=await r.json(),p=d.last_payload;if(!p)throw Error('Телеметрії V2 немає');
+const i=p.inverter||{},b=p.bms||{},pv=Number(p.pv||0),load=Number(p.load||0),cur=Number(b.current||0),soc=Number(p.soc||0);
+const grid=i.has_grid===true,mode=Number(i.control_mode);
+put('grid_v',grid?i.grid_voltage:null,0);put('grid_hz',grid?i.grid_frequency:null,1);put('pv_v',i.pv_voltage,0);put('pv_w',pv);
+put('load_v',i.output_voltage,0);put('load_w',load);put('inv_w',load);put('inv_temp',i.temperature,0);
+put('bat_soc',p.soc);put('bat_v',b.voltage,1);put('bat_w',Math.abs(Number(b.power)),0);put('bat_a',Math.abs(cur),1);
+put('gen_day',i.day_kwh,2);put('gen_total',i.total_kwh,2);
+by('mode_txt').textContent=mode===2?'PbG':mode===1?'Pu':mode===0?'AUTO':'—';
+put('inv_load_pct',null);
+const gridLoad=grid&&mode===1,gridInv=grid&&(mode===1||pv<load),batChg=cur>0.5,batDis=cur< -0.5||(mode===2&&load>pv);
+line('grid_inv',gridInv);line('grid_load',gridLoad);by('line_grid_load').classList.toggle('hide',!gridLoad);by('arr_grid_load').classList.toggle('hide',!gridLoad);
+line('pv_inv',pv>50);line('inv_load',load>20);line('bat_chg',batChg);line('bat_dis',batDis);
+by('bat_direction').textContent=batChg?'INV → АКБ':batDis?'АКБ → INV':'';
+by('bat_direction').setAttribute('fill',batChg?'#00ff88':'#ff3333');
+for(let n=1;n<=5;n++){by('seg'+n).classList.toggle('on',soc>(n-1)*20);by('seg'+n).classList.toggle('low',soc<20&&soc>(n-1)*20)}
+const age=Math.round(Date.now()/1000-Number(d.last_timestamp));by('status').textContent=Math.abs(age)>90?'НЕМАЄ СВІЖИХ ДАНИХ · '+age+' c':'ONLINE · дані '+age+' c тому';
+}catch(e){by('status').textContent='ПОМИЛКА: '+e.message}finally{pending=false}}
+update();setInterval(()=>{if(!document.hidden)update()},5000);
+</script></body></html>
