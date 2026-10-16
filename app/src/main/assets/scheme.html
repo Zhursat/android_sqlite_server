@@ -30,7 +30,7 @@
 <path id="line_inv_load" class="flow" d="M1120 440 H1290"/><polygon id="arr_inv_load" class="arrow" points="1290,440 1272,430 1272,450"/>
 <path id="line_bat_chg" class="flow" d="M930 650 V820 H545"/><polygon id="arr_bat_chg" class="arrow" points="545,820 563,810 563,830"/>
 <path id="line_bat_dis" class="flow red" d="M545 770 H1000 V650"/><polygon id="arr_bat_dis" class="arrow red" points="1000,650 990,670 1010,670"/>
-<text x="665" y="765" id="bat_direction" fill="#ff3333" font-size="27" font-weight="bold"></text>
+
 </svg>
 <div class="node grid"><div class="title">Мережа</div><div class="icon"><svg viewBox="0 0 120 180"><path d="M60 4 L50 22 H70 Z M60 22 V160 M44 22 L30 160 M76 22 L90 160 M34 46 H86 M22 52 H98 M28 52 V72 M92 52 V72 M32 82 H88 M18 88 H102 M24 88 V108 M96 88 V108 M28 118 H92 M14 124 H106 M20 124 V144 M100 124 V144 M48 38 L72 70 M72 38 L48 70"/></svg></div><div class="data"><div class="r"><span>Напруга:</span><span class="v"><span id="grid_v">—</span> В</span></div><div class="r"><span>Частота:</span><span class="v"><span id="grid_hz">—</span> Гц</span></div></div></div>
 <div class="node pv"><div class="title">PV панелі</div><div class="icon"><svg viewBox="0 0 160 150"><path d="M80 18 A44 44 0 0 1 124 62 M80 18 A44 44 0 0 0 36 62 M80 8 V0 M52 18 L45 4 M108 18 L115 4 M28 70 H132 L150 125 H10 Z M45 70 L35 125 M65 70 L60 125 M85 70 L90 125 M105 70 L115 125 M20 90 H140 M15 108 H145 M72 125 V142 H90 V125"/></svg></div><div class="data"><div class="r"><span>Напруга:</span><span class="v"><span id="pv_v">—</span> В</span></div><div class="r"><span>P:</span><span class="v"><span id="pv_w">—</span> Вт</span></div></div></div>
@@ -64,8 +64,8 @@ const batChg=fresh&&Number.isFinite(Number(b.current))&&cur>0.5;
 const batDis=fresh&&Number.isFinite(Number(b.current))&&cur< -0.5;
 line('grid_inv',false);line('grid_load',false);by('line_grid_load').classList.add('hide');by('arr_grid_load').classList.add('hide');
 line('pv_inv',fresh&&pv>50);line('inv_load',fresh&&load>20);line('bat_chg',batChg);line('bat_dis',batDis);
-by('bat_direction').textContent=batChg?'INV → АКБ':batDis?'АКБ → INV':'';
-by('bat_direction').setAttribute('fill',batChg?'#00ff88':'#ff3333');
+
+
 for(let n=1;n<=5;n++){by('seg'+n).classList.toggle('on',soc>(n-1)*20);by('seg'+n).classList.toggle('low',soc<20&&soc>(n-1)*20)}
 by('status').textContent=!fresh?'НЕМАЄ СВІЖИХ ДАНИХ · '+age+' c':'ONLINE · дані '+age+' c тому';
 }catch(e){by('status').textContent='ПОМИЛКА: '+e.message}finally{pending=false}}
