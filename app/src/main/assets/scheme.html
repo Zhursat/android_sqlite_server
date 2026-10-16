@@ -62,7 +62,11 @@ const age=Math.round(Date.now()/1000-Number(d.last_timestamp));
 const fresh=Number.isFinite(age)&&age>=-30&&age<=90;
 const batChg=fresh&&Number.isFinite(Number(b.current))&&cur>0.5;
 const batDis=fresh&&Number.isFinite(Number(b.current))&&cur< -0.5;
-line('grid_inv',false);line('grid_load',false);by('line_grid_load').classList.add('hide');by('arr_grid_load').classList.add('hide');
+// GRID -> inverter is confirmed only when grid is available and inverter reports line operation.
+const gridFeedsInverter=fresh&&grid&&i.on_battery===false;
+line('grid_inv',gridFeedsInverter);
+// Load is connected via the inverter output, not a separate direct grid connection.
+line('grid_load',false);by('line_grid_load').classList.add('hide');by('arr_grid_load').classList.add('hide');
 line('pv_inv',fresh&&pv>50);line('inv_load',fresh&&load>20);line('bat_chg',batChg);line('bat_dis',batDis);
 
 
