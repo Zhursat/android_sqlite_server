@@ -47,6 +47,19 @@ public class MyServer extends NanoHTTPD {
             }
 
             if (Method.GET.equals(session.getMethod()) &&
+                "/scheme".equals(session.getUri())) {
+                InputStream is = context.getAssets().open("scheme.html");
+                try {
+                    Scanner s = new Scanner(is, "UTF-8").useDelimiter("\\A");
+                    String html = s.hasNext() ? s.next() : "";
+                    return newFixedLengthResponse(Response.Status.OK,
+                            "text/html; charset=utf-8", html);
+                } finally {
+                    is.close();
+                }
+            }
+
+            if (Method.GET.equals(session.getMethod()) &&
                 "/dashboard".equals(session.getUri())) {
                 InputStream is = context.getAssets().open("dashboard.html");
                 try {
