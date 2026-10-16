@@ -118,6 +118,11 @@ public class MyServer extends NanoHTTPD {
             }
 
             if (Method.GET.equals(session.getMethod()) &&
+                "/api/telemetry/status".equals(session.getUri())) {
+                return telemetryStatus();
+            }
+
+            if (Method.GET.equals(session.getMethod()) &&
                 "/api/history".equals(session.getUri())) {
 
                 Map<String,String> p = session.getParms();
@@ -174,6 +179,39 @@ public class MyServer extends NanoHTTPD {
 
         } catch (Exception e) {
             return newFixedLengthResponse("ERR");
+        }
+    }
+
+    // Read-only diagnostic endpoint; never alters telemetry or the history table.
+    private Response telemetryStatus() {
+        SQLiteDatabase db = context.openOrCreateDatabase("solar.db", Context.MODE_PRIVATE, null);
+        Cursor cursor = null;
+        try {
+            JSONObject status = new JSONObject();
+            long count = android.database.DatabaseUtils.longForQuery(
+                    db, "SELECT COUNT(*) FROM telemetry_v2", null);
+            status.put("v2_records", count);
+            cursor = db.rawQuery(
+                    "SELECT ts,payload FROM telemetry_v2 ORDER BY rowid DESC LIMIT 1",
+                    null);
+            if (cursor.moveToFirst()) {
+                status.put("last_timestamp", cursor.getLong(0));
+                status.put("last_payload", new JSONObject(cursor.getString(1)));
+            } else {
+                status.put("last_timestamp", JSONObject.NULL);
+                status.put("last_payload", JSONObject.NULL);
+            }
+            Response response = newFixedLengthResponse(
+                    Response.Status.OK, "application/json; charset=utf-8",
+                    status.toString());
+            response.addHeader("Cache-Control", "no-store");
+            return response;
+        } catch (JSONException e) {
+            return newFixedLengthResponse(Response.Status.INTERNAL_ERROR,
+                    "text/plain", "Invalid stored V2 JSON");
+        } finally {
+            if (cursor != null) cursor.close();
+            db.close();
         }
     }
 
