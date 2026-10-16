@@ -46,6 +46,19 @@ public class MyServer extends NanoHTTPD {
                 return newFixedLengthResponse(Response.Status.OK, "text/html", html);
             }
 
+            if (Method.GET.equals(session.getMethod()) &&
+                "/dashboard".equals(session.getUri())) {
+                InputStream is = context.getAssets().open("dashboard.html");
+                try {
+                    Scanner s = new Scanner(is, "UTF-8").useDelimiter("\\A");
+                    String html = s.hasNext() ? s.next() : "";
+                    return newFixedLengthResponse(Response.Status.OK,
+                            "text/html; charset=utf-8", html);
+                } finally {
+                    is.close();
+                }
+            }
+
             if (Method.POST.equals(session.getMethod()) &&
                 "/api/telemetry".equals(session.getUri())) {
 
