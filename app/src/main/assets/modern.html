@@ -83,5 +83,5 @@ el('faults').textContent=(i.fault_code??'—')+' / '+(b.errors??'—');set('reco
 const cs=Array.isArray(b.cells)?b.cells:[];el('cells').innerHTML=cs.length?cs.map((v,n)=>'<div class="cell"><small>Cell '+(n+1)+'</small><b>'+fmt(v,3)+' В</b></div>').join(''):'<span style="color:var(--muted)">Немає даних комірок</span>';
 el('delta').textContent=fmt(b.cell_delta,3)+' В';
 }catch(e){const status=el('status');status.classList.add('bad');status.textContent='● ПОМИЛКА · '+e.message;['pathgridinv','pathgridload','pathpv','pathbattery','pathload'].forEach(id=>flow(id,false))}finally{busy=false}}
-load();setInterval(()=>{if(!document.hidden)load()},5000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)load()});
+load();setInterval(()=>{if(!document.hidden)load()},2000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)load()});
 </script></body></html>
