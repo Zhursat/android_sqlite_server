@@ -53,7 +53,7 @@ footer{text-align:center;color:#536b7e;margin-top:25px;font-size:12px}
 </main><script>
 const el=id=>document.getElementById(id),num=v=>typeof v==='number'&&Number.isFinite(v),fmt=(v,d=0)=>num(v)?v.toFixed(d):'—',set=(id,v,d=0)=>el(id).textContent=fmt(v,d),flow=(id,on)=>el(id).classList.toggle('live',!!on);
 let busy=false;
-async function load(){if(busy)return;busy=true;try{const r=await fetch('/api/telemetry/status',{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);const data=await r.json(),p=data.last_payload;if(!p)throw Error('Немає записів V2');const i=p.inverter||{},b=p.bms||{},age=Math.max(0,Math.round(Date.now()/1000-Number(data.last_timestamp))),fresh=Number.isFinite(age)&&age<=30,delayed=Number.isFinite(age)&&age>30&&age<=45;
+async function load(){if(busy)return;busy=true;try{const r=await fetch('/api/telemetry/status',{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);const data=await r.json(),p=data.last_payload;if(!p)throw Error('Немає записів V2');const i=p.inverter||{},b=p.bms||{},age=Number(data.age_seconds),fresh=Number.isFinite(age)&&age<=30,delayed=Number.isFinite(age)&&age>30&&age<=45;
 const status=el('status');
 status.classList.toggle('bad',!fresh&&!delayed);
 status.classList.toggle('warn',delayed);
