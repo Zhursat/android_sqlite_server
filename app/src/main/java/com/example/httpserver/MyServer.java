@@ -9,10 +9,22 @@ import org.json.JSONObject;
 
 import java.io.*;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class MyServer extends NanoHTTPD {
 
     private Context context;
+    private volatile String latestPayload;
+    private volatile long latestTimestamp;
+    private final Object sampleLock = new Object();
+    private final ExecutorService historyWriter = Executors.newSingleThreadExecutor();
+    private long windowStartMs = 0;
+    private double totalPv = 0, totalLoad = 0, totalSoc = 0;
+    private int sampleCount = 0;
+    private long lastCleanupMs = 0;
+    private static final long HISTORY_WINDOW_MS = 20000L;
+    private static final long CLEANUP_INTERVAL_MS = 86400000L;
 
     public MyServer(Context context) {
         super(5000);
@@ -22,10 +34,9 @@ public class MyServer extends NanoHTTPD {
         try {
             db.execSQL("CREATE TABLE IF NOT EXISTS data(ts INTEGER,pv REAL,load REAL,soc REAL)");
             db.execSQL("CREATE INDEX IF NOT EXISTS idx_data_ts ON data(ts)");
-            // V2 records are stored separately; the legacy data table is unchanged.
-            // JSON retains all ESP32 fields without a destructive schema migration.
-            db.execSQL("CREATE TABLE IF NOT EXISTS telemetry_v2(ts INTEGER NOT NULL, payload TEXT NOT NULL)");
-            db.execSQL("CREATE INDEX IF NOT EXISTS idx_telemetry_v2_ts ON telemetry_v2(ts)");
+            // Full V2 JSON is retained in RAM only; legacy compact history survives.
+            db.execSQL("DROP TABLE IF EXISTS telemetry_v2");
+            db.execSQL("DELETE FROM data WHERE ts < CAST(strftime('%s','now','-6 months') AS INTEGER)");
         } finally {
             db.close();
         }
@@ -131,26 +142,25 @@ public class MyServer extends NanoHTTPD {
                             "text/plain", "Telemetry values out of range");
                 }
 
-                SQLiteDatabase db = context.openOrCreateDatabase("solar.db", Context.MODE_PRIVATE, null);
-                try {
-                    db.beginTransaction();
-                    try {
-                        long timestamp = System.currentTimeMillis() / 1000;
-                        // Every POST remains visible to the original history graph.
-                        db.execSQL("INSERT INTO data VALUES(?,?,?,?)",
-                                new Object[]{timestamp, pv, load, soc});
-                        // V2 keeps the complete payload for future dashboards and BMS metrics.
-                        // Old (unversioned) POSTs do not grow the V2 table.
-                        if (isV2) {
-                            db.execSQL("INSERT INTO telemetry_v2(ts,payload) VALUES(?,?)",
-                                    new Object[]{timestamp, telemetry.toString()});
-                        }
-                        db.setTransactionSuccessful();
-                    } finally {
-                        db.endTransaction();
+                final long nowMs = System.currentTimeMillis();
+                latestPayload = isV2 ? telemetry.toString() : null;
+                latestTimestamp = nowMs / 1000L;
+                synchronized (sampleLock) {
+                    if (windowStartMs == 0) windowStartMs = nowMs;
+                    totalPv += pv; totalLoad += load; totalSoc += soc;
+                    sampleCount++;
+                    if (nowMs - windowStartMs >= HISTORY_WINDOW_MS) {
+                        final long ts = nowMs / 1000L;
+                        final double avgPv = totalPv / sampleCount;
+                        final double avgLoad = totalLoad / sampleCount;
+                        final double avgSoc = totalSoc / sampleCount;
+                        final boolean cleanup = nowMs - lastCleanupMs >= CLEANUP_INTERVAL_MS;
+                        if (cleanup) lastCleanupMs = nowMs;
+                        sampleCount = 0;
+                        totalPv = totalLoad = totalSoc = 0;
+                        windowStartMs = nowMs;
+                        historyWriter.execute(() -> saveCompactHistory(ts, avgPv, avgLoad, avgSoc, cleanup));
                     }
-                } finally {
-                    db.close();
                 }
 
                 return newFixedLengthResponse("OK");
@@ -239,66 +249,35 @@ public class MyServer extends NanoHTTPD {
         }
     }
 
-    // Validate a candidate request without forwarding or storing it.
-    // The result is informational, not authorization to operate the inverter.
+    // Control stays disabled; preflight uses the current live snapshot.
     private Response prepareControl(IHTTPSession session) {
         Map<String, String> files = new HashMap<>();
         try {
             session.parseBody(files);
-            String body = files.get("postData");
-            if (body == null || body.length() > 1024) {
-                return controlPreflightError(Response.Status.BAD_REQUEST, "invalid_body");
-            }
-            JSONObject request = new JSONObject(body);
+            JSONObject request = new JSONObject(files.get("postData"));
             Object proposed = request.opt("mode");
             if (!(proposed instanceof Number) ||
-                    ((Number) proposed).doubleValue() != ((Number) proposed).intValue() ||
-                    ((Number) proposed).intValue() < 0 ||
-                    ((Number) proposed).intValue() > 2) {
+                ((Number) proposed).intValue() != ((Number) proposed).doubleValue() ||
+                ((Number) proposed).intValue() < 0 || ((Number) proposed).intValue() > 2)
                 return controlPreflightError(Response.Status.BAD_REQUEST, "invalid_mode");
-            }
-            int target = ((Number) proposed).intValue();
-            SQLiteDatabase db = context.openOrCreateDatabase("solar.db", Context.MODE_PRIVATE, null);
-            Cursor c = null;
-            try {
-                c = db.rawQuery(
-                        "SELECT ts,payload FROM telemetry_v2 ORDER BY rowid DESC LIMIT 1",
-                        null);
-                if (!c.moveToFirst()) {
-                    return controlPreflightError(Response.Status.SERVICE_UNAVAILABLE,
-                            "no_telemetry");
-                }
-                long ts = c.getLong(0);
-                long now = System.currentTimeMillis() / 1000;
-                if (ts > now + 30 || now - ts > 60) {
-                    return controlPreflightError(Response.Status.SERVICE_UNAVAILABLE,
-                            "stale_telemetry");
-                }
-                JSONObject inv = new JSONObject(c.getString(1)).optJSONObject("inverter");
-                Object current = inv == null ? null : inv.opt("control_mode");
-                if (!(current instanceof Number) ||
-                        ((Number) current).doubleValue() != ((Number) current).intValue() ||
-                        ((Number) current).intValue() < 0 ||
-                        ((Number) current).intValue() > 2) {
-                    return controlPreflightError(Response.Status.SERVICE_UNAVAILABLE,
-                            "unknown_current_mode");
-                }
-                JSONObject reply = new JSONObject();
-                reply.put("ok", true);
-                reply.put("dry_run", true);
-                reply.put("commands_enabled", false);
-                reply.put("requested_mode", target);
-                reply.put("current_mode", ((Number) current).intValue());
-                reply.put("change_required", target != ((Number) current).intValue());
-                reply.put("reason", "preflight_only");
-                Response response = newFixedLengthResponse(Response.Status.OK,
-                        "application/json; charset=utf-8", reply.toString());
-                response.addHeader("Cache-Control", "no-store");
-                return response;
-            } finally {
-                if (c != null) c.close();
-                db.close();
-            }
+            String snapshot = latestPayload;
+            long age = System.currentTimeMillis() / 1000L - latestTimestamp;
+            if (snapshot == null || age > 60 || age < -30)
+                return controlPreflightError(Response.Status.SERVICE_UNAVAILABLE, "stale_telemetry");
+            JSONObject inv = new JSONObject(snapshot).optJSONObject("inverter");
+            Object current = inv == null ? null : inv.opt("control_mode");
+            if (!(current instanceof Number) ||
+                ((Number) current).intValue() != ((Number) current).doubleValue() ||
+                ((Number) current).intValue() < 0 || ((Number) current).intValue() > 2)
+                return controlPreflightError(Response.Status.SERVICE_UNAVAILABLE, "unknown_current_mode");
+            JSONObject reply = new JSONObject();
+            reply.put("ok", true); reply.put("dry_run", true); reply.put("commands_enabled", false);
+            reply.put("requested_mode", proposed); reply.put("current_mode", current);
+            reply.put("change_required", ((Number) proposed).intValue() != ((Number) current).intValue());
+            reply.put("reason", "preflight_only");
+            Response response = newFixedLengthResponse(Response.Status.OK, "application/json; charset=utf-8", reply.toString());
+            response.addHeader("Cache-Control", "no-store");
+            return response;
         } catch (Exception e) {
             return controlPreflightError(Response.Status.BAD_REQUEST, "invalid_request");
         }
@@ -310,86 +289,59 @@ public class MyServer extends NanoHTTPD {
                         + reason + "\"}");
     }
 
-    // STEP 08: read-only control readiness. Never sends commands to ESP32.
-    // Only freshly received V2 telemetry can serve as current state.
     private Response controlStatus() {
-        SQLiteDatabase db = context.openOrCreateDatabase("solar.db", Context.MODE_PRIVATE, null);
-        Cursor c = null;
         try {
             JSONObject result = new JSONObject();
-            result.put("commands_enabled", false);
-            result.put("source", "telemetry_v2");
-            c = db.rawQuery(
-                    "SELECT ts,payload FROM telemetry_v2 ORDER BY rowid DESC LIMIT 1",
-                    null);
-            if (!c.moveToFirst()) {
-                result.put("online", false);
-                result.put("reason", "no_telemetry");
-                result.put("control_mode", JSONObject.NULL);
-            } else {
-                long ts = c.getLong(0);
-                long age = Math.max(0, System.currentTimeMillis() / 1000L - ts);
-                JSONObject payload = new JSONObject(c.getString(1));
-                JSONObject inverter = payload.optJSONObject("inverter");
-                Object mode = inverter == null ? null : inverter.opt("control_mode");
-                boolean recognized = mode instanceof Number &&
-                        ((Number) mode).doubleValue() == ((Number) mode).intValue() &&
-                        ((Number) mode).intValue() >= 0 &&
-                        ((Number) mode).intValue() <= 2;
-                result.put("last_timestamp", ts);
-                result.put("age_seconds", age);
-                result.put("online", age <= 90);
-                result.put("control_mode", recognized ? mode : JSONObject.NULL);
-                result.put("mode_name", recognized ?
-                        new String[]{"AUTO", "PU", "PBG"}[((Number) mode).intValue()] :
-                        JSONObject.NULL);
-                result.put("reason", age > 90 ? "stale_telemetry" :
-                        recognized ? "read_only" : "unknown_mode");
-            }
-            Response response = newFixedLengthResponse(
-                    Response.Status.OK, "application/json; charset=utf-8",
-                    result.toString());
+            result.put("commands_enabled", false); result.put("source", "live_memory");
+            String snapshot = latestPayload;
+            long ts = latestTimestamp;
+            long age = ts == 0 ? Long.MAX_VALUE : Math.max(0, System.currentTimeMillis() / 1000L - ts);
+            JSONObject inv = snapshot == null ? null : new JSONObject(snapshot).optJSONObject("inverter");
+            Object mode = inv == null ? null : inv.opt("control_mode");
+            boolean recognized = mode instanceof Number &&
+                ((Number) mode).doubleValue() == ((Number) mode).intValue() &&
+                ((Number) mode).intValue() >= 0 && ((Number) mode).intValue() <= 2;
+            result.put("online", snapshot != null && age <= 90);
+            result.put("last_timestamp", ts == 0 ? JSONObject.NULL : ts);
+            result.put("age_seconds", ts == 0 ? JSONObject.NULL : age);
+            result.put("control_mode", recognized ? mode : JSONObject.NULL);
+            result.put("mode_name", recognized ?
+                new String[]{"AUTO", "PU", "PBG"}[((Number) mode).intValue()] : JSONObject.NULL);
+            result.put("reason", snapshot == null ? "no_telemetry" :
+                age > 90 ? "stale_telemetry" : recognized ? "read_only" : "unknown_mode");
+            Response response = newFixedLengthResponse(Response.Status.OK, "application/json; charset=utf-8", result.toString());
             response.addHeader("Cache-Control", "no-store");
             return response;
         } catch (JSONException e) {
-            return newFixedLengthResponse(Response.Status.INTERNAL_ERROR,
-                    "text/plain", "Invalid stored telemetry");
-        } finally {
-            if (c != null) c.close();
-            db.close();
+            return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "text/plain", "Invalid live telemetry");
         }
     }
 
-    // Read-only diagnostic endpoint; never alters telemetry or the history table.
     private Response telemetryStatus() {
-        SQLiteDatabase db = context.openOrCreateDatabase("solar.db", Context.MODE_PRIVATE, null);
-        Cursor cursor = null;
         try {
             JSONObject status = new JSONObject();
-            long count = android.database.DatabaseUtils.longForQuery(
-                    db, "SELECT COUNT(*) FROM telemetry_v2", null);
-            status.put("v2_records", count);
-            cursor = db.rawQuery(
-                    "SELECT ts,payload FROM telemetry_v2 ORDER BY rowid DESC LIMIT 1",
-                    null);
-            if (cursor.moveToFirst()) {
-                status.put("last_timestamp", cursor.getLong(0));
-                status.put("last_payload", new JSONObject(cursor.getString(1)));
-            } else {
-                status.put("last_timestamp", JSONObject.NULL);
-                status.put("last_payload", JSONObject.NULL);
-            }
-            Response response = newFixedLengthResponse(
-                    Response.Status.OK, "application/json; charset=utf-8",
-                    status.toString());
+            String snapshot = latestPayload;
+            status.put("v2_records", 0);
+            status.put("last_timestamp", snapshot == null ? JSONObject.NULL : latestTimestamp);
+            status.put("last_payload", snapshot == null ? JSONObject.NULL : new JSONObject(snapshot));
+            Response response = newFixedLengthResponse(Response.Status.OK, "application/json; charset=utf-8", status.toString());
             response.addHeader("Cache-Control", "no-store");
             return response;
         } catch (JSONException e) {
-            return newFixedLengthResponse(Response.Status.INTERNAL_ERROR,
-                    "text/plain", "Invalid stored V2 JSON");
+            return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "text/plain", "Invalid live JSON");
+        }
+    }
+
+    private void saveCompactHistory(long ts, double pv, double load, double soc, boolean cleanup) {
+        SQLiteDatabase db = null;
+        try {
+            db = context.openOrCreateDatabase("solar.db", Context.MODE_PRIVATE, null);
+            db.execSQL("INSERT INTO data(ts,pv,load,soc) VALUES(?,?,?,?)", new Object[]{ts, pv, load, soc});
+            if (cleanup) db.execSQL("DELETE FROM data WHERE ts < CAST(strftime('%s','now','-6 months') AS INTEGER)");
+        } catch (Exception e) {
+            android.util.Log.e("SolarHistory", "History write failed", e);
         } finally {
-            if (cursor != null) cursor.close();
-            db.close();
+            if (db != null) db.close();
         }
     }
 
