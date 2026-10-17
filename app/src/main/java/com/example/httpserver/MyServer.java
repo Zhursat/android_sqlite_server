@@ -17,6 +17,7 @@ public class MyServer extends NanoHTTPD {
     private Context context;
     private volatile String latestPayload;
     private volatile long latestTimestamp;
+    private volatile long latestReceivedElapsedMs;
     private final Object sampleLock = new Object();
     private final ExecutorService historyWriter = Executors.newSingleThreadExecutor();
     private long windowStartMs = 0;
@@ -145,6 +146,7 @@ public class MyServer extends NanoHTTPD {
                 final long nowMs = System.currentTimeMillis();
                 latestPayload = isV2 ? telemetry.toString() : null;
                 latestTimestamp = nowMs / 1000L;
+                latestReceivedElapsedMs = android.os.SystemClock.elapsedRealtime();
                 synchronized (sampleLock) {
                     if (windowStartMs == 0) windowStartMs = nowMs;
                     totalPv += pv; totalLoad += load; totalSoc += soc;
@@ -323,6 +325,7 @@ public class MyServer extends NanoHTTPD {
             String snapshot = latestPayload;
             status.put("v2_records", 0);
             status.put("last_timestamp", snapshot == null ? JSONObject.NULL : latestTimestamp);
+            status.put("age_seconds", snapshot == null ? JSONObject.NULL : Math.max(0L, (android.os.SystemClock.elapsedRealtime() - latestReceivedElapsedMs) / 1000L));
             status.put("last_payload", snapshot == null ? JSONObject.NULL : new JSONObject(snapshot));
             Response response = newFixedLengthResponse(Response.Status.OK, "application/json; charset=utf-8", status.toString());
             response.addHeader("Cache-Control", "no-store");
