@@ -81,7 +81,8 @@ flow('pathpv',fresh&&num(p.pv)&&p.pv>30);
 flow('pathbattery',dis||chg);
 el('pathbattery').classList.toggle('discharge',dis);
 el('pathbattery').classList.toggle('reverse',chg);
-flow('pathload',fresh&&num(p.load)&&p.load>20&&!gridDirect);
+// Output path remains active whenever measured load is present, even during PU/grid assist.
+flow('pathload',fresh&&num(p.load)&&p.load>20);
 el('batdirection').textContent=!curValid?'Немає даних':dis?'Розряд':chg?'Заряджання':'Очікування';
 el('bata').textContent=fmt(cur,2)+' А';el('batw').textContent=fmt(b.power,0)+' Вт';el('soh').textContent=fmt(b.soh)+' %';
 el('temp').textContent=fmt(i.temperature)+' °C';el('today').textContent=fmt(i.day_kwh,2)+' кВт·год';el('total').textContent=fmt(i.total_kwh,2)+' кВт·год';
