@@ -46,7 +46,7 @@ footer{text-align:center;color:#536b7e;margin-top:25px;font-size:12px}
 </div><div class="flowlegend"><span><i class="dot"></i>Підтверджений активний потік</span><span><i class="dot red"></i>Розряд АКБ</span><span><i class="dot gray"></i>Немає підтвердженого потоку</span></div>
 </section><div class="side">
 <section class="card"><h3>Стан акумулятора</h3><div class="batteryRing" id="ring"><div><strong><span id="ringsoc">—</span>%</strong><small>Залишок заряду</small></div></div><div class="details"><div class="detail"><span>Струм BMS</span><b id="bata">—</b></div><div class="detail"><span>Потужність BMS</span><b id="batw">—</b></div><div class="detail"><span>SOH / здоров’я АКБ</span><b id="soh">—</b></div></div></section>
-<section class="card"><h3>Параметри інвертора</h3><div class="details"><div class="detail"><span>Джерело живлення</span><b id="source">—</b></div><div class="detail"><span>Керування</span><b id="control">—</b></div><div class="detail"><span>Температура</span><b id="temp">—</b></div><div class="detail"><span>Генерація за день</span><b id="today">—</b></div><div class="detail"><span>Загальна генерація</span><b id="total">—</b></div></div></section>
+<section class="card"><h3>Параметри інвертора</h3><div class="details"><div class="detail"><span>Джерела (оцінка)</span><b id="source">—</b></div><div class="detail"><span>Режим інвертора</span><b id="invmode">—</b></div><div class="detail"><span>Керування</span><b id="control">—</b></div><div class="detail"><span>Температура</span><b id="temp">—</b></div><div class="detail"><span>Генерація за день</span><b id="today">—</b></div><div class="detail"><span>Загальна генерація</span><b id="total">—</b></div></div></section>
 </div></div>
 <div class="bottom"><section class="card"><h3>Напруга комірок BMS</h3><div class="cells" id="cells">Очікування даних...</div><p style="color:var(--muted);font-size:12px;margin-bottom:0">Різниця між комірками: <b id="delta" style="color:var(--cyan)">—</b></p></section><section class="card"><h3>Стан та температури</h3><div class="details"><div class="detail"><span>BMS T1 / T2</span><b id="temps">—</b></div><div class="detail"><span>Температура MOS</span><b id="mostemp">—</b></div><div class="detail"><span>Помилки BMS / інвертора</span><b id="faults">—</b></div><div class="detail"><span>LIVE-пакет</span><b id="records">—</b></div></div></section></div>
 <section class="card weather-card"><div class="weather-title"><h3>Погода · Журавка</h3><span>Sinoptik.ua</span></div>
@@ -54,6 +54,31 @@ footer{text-align:center;color:#536b7e;margin-top:25px;font-size:12px}
 <p class="weather-note">Погода завантажується з Sinoptik.ua за наявності інтернету.</p></section><footer>Solar Monitor PRO 2.0 · Aurora · лише моніторинг · оновлення кожні 2 секунди</footer>
 </main><script>
 const el=id=>document.getElementById(id),num=v=>typeof v==='number'&&Number.isFinite(v),fmt=(v,d=0)=>num(v)?v.toFixed(d):'—',set=(id,v,d=0)=>el(id).textContent=fmt(v,d),flow=(id,on)=>el(id).classList.toggle('live',!!on);
+// Energy-source labels are an estimate, not a measurement of individual grid/PV flows.
+function assessPowerSources(i,p,b,fresh){
+  if(!fresh)return {source:'Немає актуальних даних',mode:'—'};
+  const island=i.on_battery===true,line=i.on_battery===false&&i.has_grid===true;
+  const mode=island?'Автономний':line?'Мережевий':'Не підтверджено';
+  const solar=num(p.pv)&&p.pv>30,load=num(p.load)&&p.load>20;
+  const dis=num(b.current)&&b.current<-.5,chg=num(b.current)&&b.current>.5;
+  const priority=num(i.auto_mode_active)?i.auto_mode_active:null;
+  let source='Режим не підтверджено';
+  if(island){
+    if(solar&&load)source=dis?'PV + АКБ':chg?'PV · заряд АКБ':'PV';
+    else if(solar&&chg)source='PV · заряд АКБ';
+    else if(!solar&&dis)source='АКБ';
+    else source='Автономний режим';
+  }else if(line){
+    if(load){
+      if(solar&&(priority===1||priority===2)){
+        if(p.pv<p.load-30)source=dis?'PV + АКБ + Мережа':'PV + Мережа';
+        else source=dis?'PV + АКБ (мережа доступна)':'PV (мережа доступна)';
+      }else if(dis)source=solar?'Мережа + АКБ · PV активне':'Мережа + АКБ';
+      else source=solar?'Мережа · PV активне':'Мережа';
+    }else source=solar&&chg?'PV · заряд АКБ':'Мережевий режим';
+  }
+  return {source,mode};
+}
 let busy=false;
 async function load(){if(busy)return;busy=true;try{const r=await fetch('/api/telemetry/status',{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);const data=await r.json(),p=data.last_payload;if(!p)throw Error('Немає записів V2');const i=p.inverter||{},b=p.bms||{},age=Number(data.age_seconds),fresh=Number.isFinite(age)&&age<=6,delayed=Number.isFinite(age)&&age>6&&age<=15;
 const status=el('status');
@@ -68,8 +93,10 @@ el('gridbox').textContent=fmt(i.has_grid===true?i.grid_voltage:null,0)+' В';el(
 el('pvbox').textContent=fmt(p.pv)+' Вт';el('invpower').textContent=fmt(p.load)+' Вт';el('loadbox').textContent=fmt(p.load)+' Вт';el('batbox').textContent=fmt(p.soc)+' %';
 el('ring').style.setProperty('--percent',num(p.soc)?Math.max(0,Math.min(100,p.soc)):0);set('ringsoc',p.soc);
 const onBattery=i.on_battery===true,gridFeed=fresh&&i.has_grid===true&&i.on_battery===false,cur=b.current;
-el('invstate').textContent=onBattery?'Робота від АКБ':gridFeed?'Робота від мережі':'Режим не підтверджено';
-el('source').textContent=onBattery?'АКБ':gridFeed?'Мережа':'—';
+const power=assessPowerSources(i,p,b,fresh);
+el('invstate').textContent=power.source;
+el('source').textContent=power.source;
+el('invmode').textContent=power.mode;
 const mode=Number(i.control_mode);el('control').textContent=mode===0?'AUTO':mode===1?'PU':mode===2?'PBG':'—';el('mode').textContent='Керування · '+el('control').textContent;
 const curValid=num(cur),dis=fresh&&curValid&&cur<-.5,chg=fresh&&curValid&&cur>.5;
 const opr=num(i.auto_mode_active)?i.auto_mode_active:null;
