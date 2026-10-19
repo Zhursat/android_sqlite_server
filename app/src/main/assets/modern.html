@@ -43,7 +43,31 @@ footer{text-align:center;color:#536b7e;margin-top:25px;font-size:12px}
 .tile-cells .cell small{font-size:8px}.tile-cells .cell b{font-size:10px}
 .flowoverlay{pointer-events:none}
 @media(max-width:600px){.flowgrid{grid-template-rows:160px 230px 320px;min-height:740px;column-gap:0}.unitbox{padding:8px 4px}.unitbox .mrow{font-size:9px}.unitbox .power{font-size:17px}.unitbox b{font-size:10px}.tile-cells .cells{grid-template-columns:repeat(2,minmax(0,1fr))}.tile-cells .cell{padding:2px}.tile-cells .cell b{font-size:10px}}
-</style></head><body><main>
+/* STEP17 compact clickable energy cards */
+.flowgrid{grid-template-rows:140px 140px 140px;min-height:444px;row-gap:12px;align-items:center}
+.flowgrid .unitbox{min-height:102px;max-height:none;padding:13px;justify-content:center;overflow:visible;cursor:pointer;transition:border-color .16s,background .16s}
+.flowgrid .unitbox:hover,.flowgrid .unitbox:focus-visible{border-color:#43b6b6;background:#173247;outline:none}
+.flowgrid .unitbox:focus-visible{box-shadow:0 0 0 2px #43b6b6}
+.flowgrid .unitbox .metrics,.flowgrid .unitbox .tile-cells{display:none}
+.flowgrid .invunit{min-height:145px;max-width:240px;width:100%}
+.flowgrid .unitbox .power{font-size:24px}
+.flowgrid .unitbox b{font-size:13px}
+.flowgrid .batteryunit .soc-icon{width:28px!important;height:37px!important}
+.flowgrid .batteryunit .power{font-size:24px}
+.flowgrid .unitbox::after{content:'Деталі ↗';font-size:10px;color:#7396ac}
+.flowoverlay{pointer-events:none}
+.tile-dialog{border:1px solid #386277;background:#101e2c;color:#eef7ff;border-radius:18px;box-shadow:0 24px 75px #000a;width:min(550px,calc(100vw - 24px));max-height:85vh;padding:20px;overflow-y:auto}
+.tile-dialog::backdrop{background:#010914c9;backdrop-filter:blur(2px)}
+.dialog-title{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:15px}
+.dialog-title h3{margin:0;font-size:19px}
+.dialog-close{border:1px solid #436073;background:#192d3a;border-radius:8px;color:#d5e9f5;padding:8px 14px;cursor:pointer;font-size:14px}
+.dialog-grid{display:grid;gap:8px}
+.dialog-grid .mrow{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid #284050;padding:7px 0;font-size:14px}
+.dialog-grid .mrow span{color:#9db3c2}.dialog-grid .mrow strong{color:#f0f9ff;text-align:right;overflow-wrap:anywhere}
+.dialog-grid .tile-cells{margin-top:12px}.dialog-grid .cells{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+.dialog-grid .cell{padding:8px 3px}.dialog-grid .cell b{font-size:13px}
+@media(max-width:600px){.flowgrid{grid-template-rows:112px 112px 112px;min-height:348px}.flowgrid .unitbox{padding:7px 3px;min-height:95px}.flowgrid .unitbox b{font-size:11px}.flowgrid .unitbox .power{font-size:18px}.flowgrid .invunit{min-height:124px}.dialog-grid .cells{grid-template-columns:repeat(4,minmax(0,1fr))}}
+</style></head><body><dialog id="tileDialog" class="tile-dialog"><div class="dialog-title"><h3 id="dialogTitle">Показники</h3><button type="button" class="dialog-close" id="dialogClose">Закрити ✕</button></div><div id="dialogContent" class="dialog-grid"></div></dialog><main>
 <header><div class="brand"><div class="brandmark">S<span style="color:#ffd065">●</span></div><div><h1>Solar Monitor <span style="color:var(--mint)">PRO</span></h1><small>Energy command center · 2.0</small></div></div><nav><a href="/scheme">Класична схема</a><a href="/">Історія</a><a href="http://192.168.0.142/config" target="_blank" rel="noopener noreferrer">Налаштування ↗</a></nav></header>
 <div class="heading"><div><h2>Моніторинг домашньої енергосистеми</h2></div><div id="status" class="status bad">● Очікування телеметрії</div><div id="lastseen" style="font-size:12px;color:var(--muted)">Останній пакет: немає</div></div>
 <div class="stats">
@@ -54,15 +78,15 @@ footer{text-align:center;color:#536b7e;margin-top:25px;font-size:12px}
 </div>
 <div class="layout"><section class="card visual"><div class="sectionTop"><h3>⚡ Схема енергопотоків</h3><span class="chip" id="mode">Режим: —</span></div>
 <div class="flowgrid">
-<div class="unitbox gridunit"><svg viewBox="0 0 36 36"><path d="M18 2v32M8 11h20M4 19h28M12 11L4 34M24 11l8 23M12 19l12 15M24 19L12 34"/></svg><b>МЕРЕЖА</b><span class="power" id="gridbox">— В</span><small id="gridlabel">Статус невідомий</small><div class="metrics"><div class="mrow"><span>Напруга</span><strong id="glinev">—</strong></div><div class="mrow"><span>Частота</span><strong id="glinehz">—</strong></div></div></div>
+<div class="unitbox gridunit"><svg viewBox="0 0 36 36" aria-label="Електроопора"><path d="M15 3h6l8 30M15 3L7 33M21 3l8 30M10 13h16M7 19h22M5 25h26M13 13l10 12M23 13L13 25M11 33h14M16 3V1M20 3V1"/></svg><b>МЕРЕЖА</b><span class="power" id="gridbox">— В</span><small id="gridlabel">Статус невідомий</small><div class="metrics"><div class="mrow"><span>Напруга</span><strong id="glinev">—</strong></div><div class="mrow"><span>Частота</span><strong id="glinehz">—</strong></div></div></div>
 <div class="unitbox pvunit"><svg viewBox="0 0 36 36" aria-label="Сонячна панель"><circle cx="9" cy="8" r="3.2"/><path d="M9 1v2M9 13v2M2 8h2M14 8h2M4 3l1.6 1.6M14 3l-1.6 1.6"/><path d="M10 14H31L27 27H5z"/><path d="M16 14l-5 13M23 14l-4 13M7.5 20.5h21.5M20 27v4M13 31h14"/></svg><b>PV МОДУЛІ</b><span class="power" id="pvbox">— Вт</span><small>Сонячна енергія</small><div class="metrics"><div class="mrow"><span>Напруга PV</span><strong id="tilepv_v">—</strong></div><div class="mrow"><span>Струм PV</span><strong id="tilepv_a">—</strong></div><div class="mrow"><span>За добу</span><strong id="tilepv_day">—</strong></div><div class="mrow"><span>Усього</span><strong id="tilepv_total">—</strong></div></div></div>
-<svg class="flowoverlay" viewBox="0 0 1000 760" preserveAspectRatio="none" aria-hidden="true">
+<svg class="flowoverlay" viewBox="0 0 1000 444" preserveAspectRatio="none" aria-hidden="true">
 <defs><marker id="arrowGreen" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0 0L6 3L0 6" fill="none" stroke="#31e6ad" stroke-width="1.3"/></marker><marker id="arrowRed" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0 0L6 3L0 6" fill="none" stroke="#ff1717" stroke-width="1.3"/></marker></defs>
-<path id="pathgridinv" d="M285 86 H348 V272 H358"/>
-<path id="pathgridload" d="M285 52 H950 V300 H805"/>
-<path id="pathpv" d="M285 300 H358"/>
-<path id="pathbattery" d="M285 600 H326 V350 H358"/>
-<path id="pathload" d="M670 314 H705"/>
+<path id="pathgridinv" d="M285 70 H348 V200 H358"/>
+<path id="pathgridload" d="M285 42 H950 V208 H805"/>
+<path id="pathpv" d="M285 222 H358"/>
+<path id="pathbattery" d="M285 375 H326 V254 H358"/>
+<path id="pathload" d="M670 233 H705"/>
 </svg>
 <div class="unitbox invunit"><svg viewBox="0 0 36 36"><rect x="5" y="6" width="26" height="25" rx="4"/><path d="M9 20q4-10 9 0t9 0"/></svg><b>ІНВЕРТОР J4000HC</b><span class="power invtext" id="invpower">— Вт</span><small id="invstate">Очікування даних</small><div class="metrics"><div class="mrow"><span>Режим</span><strong id="tile_inv_mode">—</strong></div><div class="mrow"><span>Пріоритет</span><strong id="tile_opr">—</strong></div><div class="mrow"><span>Керування</span><strong id="tile_control">—</strong></div><div class="mrow"><span>Заряджання</span><strong id="tile_charge">—</strong></div><div class="mrow"><span>Температура</span><strong id="tile_temp">—</strong></div><div class="mrow"><span>Завантаження</span><strong id="tile_pct">—</strong></div><div class="mrow"><span>Помилка</span><strong id="tile_fault">—</strong></div></div></div>
 <div class="unitbox batteryunit"><svg class="soc-icon" viewBox="0 0 120 160" aria-label="Рівень акумулятора"><rect x="25" y="22" width="70" height="120" rx="5"/><rect x="48" y="10" width="24" height="12" rx="2"/><rect class="seg" id="socseg5" x="34" y="34" width="52" height="17"/><rect class="seg" id="socseg4" x="34" y="55" width="52" height="17"/><rect class="seg" id="socseg3" x="34" y="76" width="52" height="17"/><rect class="seg" id="socseg2" x="34" y="97" width="52" height="17"/><rect class="seg" id="socseg1" x="34" y="118" width="52" height="17"/></svg><b>АКУМУЛЯТОР</b><span class="power" id="batbox">— %</span><small id="batdirection">Очікування струму</small><div class="metrics"><div class="mrow"><span>Напруга</span><strong id="tile_bv">—</strong></div><div class="mrow"><span>Струм</span><strong id="tile_ba">—</strong></div><div class="mrow"><span>Потужність</span><strong id="tile_bw">—</strong></div><div class="mrow"><span>SOH</span><strong id="tile_soh">—</strong></div><div class="mrow"><span>T1 / T2</span><strong id="tile_t">—</strong></div><div class="mrow"><span>MOS</span><strong id="tile_mos">—</strong></div><div class="mrow"><span>Помилки</span><strong id="tile_bfault">—</strong></div></div><div class="tile-cells"><div class="cells" id="tile_cells">Очікування комірок…</div><small>Δ: <span id="tile_delta">—</span></small></div></div>
@@ -99,6 +123,37 @@ function assessPowerSources(i,p,b,fresh){
   }
   return {source,mode};
 }
+const tileNames={gridunit:'Електромережа',pvunit:'Сонячні модулі',batteryunit:'Акумулятор · JK BMS',invunit:'Інвертор J4000HC',loadunit:'Споживачі'};
+let selectedTile=null;
+function tileDetails(tile){
+ const dlg=el('tileDialog'),content=el('dialogContent');
+ selectedTile=tile;
+ el('dialogTitle').textContent=tileNames[tile]||'Показники';
+ const src=document.querySelector('.'+tile+' .metrics');
+ content.replaceChildren();
+ if(src)content.appendChild(src.cloneNode(true));
+ const extras=document.querySelector('.'+tile+' .tile-cells');
+ if(extras)content.appendChild(extras.cloneNode(true));
+ dlg.showModal();
+}
+function refreshTileDetails(){
+ if(!selectedTile||!el('tileDialog').open)return;
+ const target=document.querySelector('.'+selectedTile);
+ const host=el('dialogContent');host.replaceChildren();
+ for(const selector of ['.metrics','.tile-cells']){
+  const piece=target?.querySelector(selector);
+  if(piece)host.appendChild(piece.cloneNode(true));
+ }
+}
+document.querySelectorAll('.flowgrid .unitbox').forEach(tile=>{
+ tile.tabIndex=0;tile.setAttribute('role','button');tile.setAttribute('aria-label','Детальні показники: '+(tileNames[Array.from(tile.classList).find(x=>tileNames[x])]||''));
+ const name=Array.from(tile.classList).find(x=>tileNames[x]);
+ tile.addEventListener('click',()=>tileDetails(name));
+ tile.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();tileDetails(name)}});
+});
+el('dialogClose').addEventListener('click',()=>el('tileDialog').close());
+el('tileDialog').addEventListener('click',e=>{if(e.target===el('tileDialog'))el('tileDialog').close()});
+el('tileDialog').addEventListener('close',()=>{selectedTile=null});
 let busy=false;
 async function load(){if(busy)return;busy=true;try{const r=await fetch('/api/telemetry/status',{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);const data=await r.json(),p=data.last_payload;if(!p)throw Error('Немає записів V2');const i=p.inverter||{},b=p.bms||{},age=Number(data.age_seconds),fresh=Number.isFinite(age)&&age<=6,delayed=Number.isFinite(age)&&age>6&&age<=15;
 const status=el('status');
@@ -153,7 +208,7 @@ flow('pathload',fresh&&num(p.load)&&p.load>20);
 el('batdirection').textContent=!curValid?'Немає даних':dis?'Розряд':chg?'Заряджання':'Очікування';
 const cs=Array.isArray(b.cells)?b.cells:[];
 el('tile_cells').innerHTML=cs.length?cs.map((v,n)=>'<div class="cell"><small>'+(n+1)+'</small><b>'+fmt(v,3)+'</b></div>').join(''):'—';
-el('tile_delta').textContent=fmt(b.cell_min,3)+' / '+fmt(b.cell_max,3)+' / '+fmt(b.cell_delta,3)+' В';
+el('tile_delta').textContent=fmt(b.cell_min,3)+' / '+fmt(b.cell_max,3)+' / '+fmt(b.cell_delta,3)+' В';refreshTileDetails();
 }catch(e){const status=el('status');status.classList.add('bad');status.classList.remove('warn');status.textContent='● НЕМАЄ LIVE-ДАНИХ · '+e.message;document.body.classList.add('stale');el('lastseen').textContent='Останній пакет: невідомо';['pathgridinv','pathgridload','pathpv','pathbattery','pathload'].forEach(id=>flow(id,false))}finally{busy=false}}
 load();setInterval(()=>{if(!document.hidden)load()},2000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)load()});
 </script><script src="https://sinoptik.ua/api/informer/content?loc=PSCYBwPOCSPEPSPObUgubkhO&cem=8r5Eg7b5iAD7cM=0cTYUcnErbwhYbSiePwAl2w3"></script></body></html>
