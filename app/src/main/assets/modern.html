@@ -219,7 +219,17 @@ const onBattery=i.on_battery===true,gridFeed=fresh&&i.has_grid===true&&i.on_batt
 const power=assessPowerSources(i,p,b,fresh);
 el('invstate').textContent=power.source;
 el('tile_inv_mode').textContent=power.mode;
-const mode=Number(i.control_mode);const controlMode=mode===0?'AUTO':mode===1?'PU':mode===2?'PBG':'—';el('mode').textContent='Керування · '+controlMode;el('tile_opr').textContent=i.auto_mode_active===0?'Gtd':i.auto_mode_active===1?'PU':i.auto_mode_active===2?'PBG':'—';el('tile_control').textContent=controlMode;el('tile_charge').textContent=i.charging===true?'Так':i.charging===false?'Ні':'—';
+const rawControl=i.control_mode,controlKnown=rawControl!==null&&rawControl!==undefined&&rawControl!=='';
+const mode=controlKnown?Number(rawControl):NaN;
+const controlMode=mode===0?'AUTO':mode===1?'PU':mode===2?'PBG':mode===3?'Gtd':'—';
+const rawOpr=i.auto_mode_active,oprKnown=rawOpr!==null&&rawOpr!==undefined&&rawOpr!=='';
+const currentOpr=oprKnown?Number(rawOpr):NaN;
+const actualMode=currentOpr===0?'Gtd':currentOpr===1?'PU':currentOpr===2?'PBG':'—';
+const modeOrigin=mode===0?'Auto':(mode===1||mode===2||mode===3)?'Manual':'—';
+const modeLabel=actualMode!=='—'&&modeOrigin!=='—'?actualMode+' - '+modeOrigin:'—';
+el('mode').textContent='Режим · '+modeLabel;
+el('tile_opr').textContent=actualMode;
+el('tile_control').textContent=modeOrigin==='—'?'—':controlMode+' - '+modeOrigin;el('tile_charge').textContent=i.charging===true?'Так':i.charging===false?'Ні':'—';
 const curValid=num(cur),dis=fresh&&curValid&&cur<-.5,chg=fresh&&curValid&&cur>.5;
 const opr=num(i.auto_mode_active)?i.auto_mode_active:null;
 const gridIn=fresh&&i.has_grid===true&&i.on_battery===false;
