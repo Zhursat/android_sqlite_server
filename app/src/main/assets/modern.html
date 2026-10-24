@@ -43,6 +43,7 @@ footer{text-align:center;color:#536b7e;margin-top:25px;font-size:12px}
 .tile-cells .cell small{font-size:8px}.tile-cells .cell b{font-size:10px}
 .flowoverlay{pointer-events:none}
 @media(max-width:600px){.flowgrid{grid-template-rows:160px 230px 320px;min-height:740px;column-gap:0}.unitbox{padding:8px 4px}.unitbox .mrow{font-size:9px}.unitbox .power{font-size:17px}.unitbox b{font-size:10px}.tile-cells .cells{grid-template-columns:repeat(2,minmax(0,1fr))}.tile-cells .cell{padding:2px}.tile-cells .cell b{font-size:10px}}
+.modechips{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:7px}.modechips .chip{white-space:nowrap}@media(max-width:600px){.modechips{justify-content:flex-start}}
 /* STEP17 compact clickable energy cards */
 .flowgrid{grid-template-rows:140px 140px 140px;min-height:444px;row-gap:12px;align-items:center}
 .flowgrid .unitbox{min-height:102px;max-height:none;padding:13px;justify-content:center;overflow:visible;cursor:pointer;transition:border-color .16s,background .16s}
@@ -76,7 +77,7 @@ footer{text-align:center;color:#536b7e;margin-top:25px;font-size:12px}
 <div class="card metric"><div class="metrichead">Навантаження <span class="emblem">⌂</span></div><div class="num mint"><span id="load">—</span> <small>Вт</small></div><div class="metricfoot">Вихід: <b id="outv">—</b> В</div></div>
 <div class="card metric"><div class="metrichead">Заряд батареї <span class="emblem">▣</span></div><div class="num cyan"><span id="soc">—</span> <small>%</small></div><div class="metricfoot">BMS: <b id="batv">—</b> В</div></div>
 </div>
-<div class="layout"><section class="card visual"><div class="sectionTop"><h3>⚡ Схема енергопотоків</h3><span class="chip" id="mode">Режим: —</span></div>
+<div class="layout"><section class="card visual"><div class="sectionTop"><h3>⚡ Схема енергопотоків</h3><div class="modechips"><span class="chip" id="mode">Режим інвертування: —</span><span class="chip" id="chargePriority">Режим заряду: —</span></div></div>
 <div class="flowgrid">
 <div class="unitbox gridunit"><svg viewBox="0 0 36 36" aria-label="Опора лінії електропередачі"><path d="M16 3h4M16 3L9 33M20 3L27 33M9 33h18M13 14h10M11 22h14M10 30h16M13 14l11 16M23 14L12 30M5 10h26M3 16h30M7 10v3M29 10v3M4 16v3M32 16v3M18 3V1" /></svg><b>МЕРЕЖА</b><span class="power" id="gridbox">— В</span><small id="gridlabel">Статус невідомий</small><div class="metrics"><div class="mrow"><span>Напруга</span><strong id="glinev">—</strong></div><div class="mrow"><span>Частота</span><strong id="glinehz">—</strong></div></div></div>
 <div class="unitbox pvunit"><svg viewBox="0 0 36 36" aria-label="Сонячна панель"><circle cx="9" cy="8" r="3.2"/><path d="M9 1v2M9 13v2M2 8h2M14 8h2M4 3l1.6 1.6M14 3l-1.6 1.6"/><path d="M10 14H31L27 27H5z"/><path d="M16 14l-5 13M23 14l-4 13M7.5 20.5h21.5M20 27v4M13 31h14"/></svg><b>PV МОДУЛІ</b><span class="power" id="pvbox">— Вт</span><small>Сонячна енергія</small><div class="metrics"><div class="mrow"><span>Напруга PV</span><strong id="tilepv_v">—</strong></div><div class="mrow"><span>Струм PV</span><strong id="tilepv_a">—</strong></div><div class="mrow"><span>За добу</span><strong id="tilepv_day">—</strong></div><div class="mrow"><span>Усього</span><strong id="tilepv_total">—</strong></div></div></div>
@@ -227,7 +228,12 @@ const currentOpr=oprKnown?Number(rawOpr):NaN;
 const actualMode=currentOpr===0?'Gtd':currentOpr===1?'PU':currentOpr===2?'PBG':'—';
 const modeOrigin=mode===0?'Auto':(mode===1||mode===2||mode===3)?'Manual':'—';
 const modeLabel=actualMode!=='—'&&modeOrigin!=='—'?actualMode+' - '+modeOrigin:'—';
-el('mode').textContent='Режим · '+modeLabel;
+el('mode').textContent='Режим інвертування: '+modeLabel;
+const rawCpr=i.charge_priority;
+const cprKnown=rawCpr!==null&&rawCpr!==undefined&&rawCpr!=='';
+const cpr=cprKnown?Number(rawCpr):NaN;
+const chargerNames=['Мережа','Сонце пріоритет','Мережа+Сонце','Тільки сонце'];
+el('chargePriority').textContent='Режим заряду: '+(Number.isInteger(cpr)&&cpr>=0&&cpr<=3?chargerNames[cpr]:'—');
 el('tile_opr').textContent=actualMode;
 el('tile_control').textContent=modeOrigin==='—'?'—':controlMode+' - '+modeOrigin;el('tile_charge').textContent=i.charging===true?'Так':i.charging===false?'Ні':'—';
 const curValid=num(cur),dis=fresh&&curValid&&cur<-.5,chg=fresh&&curValid&&cur>.5;
