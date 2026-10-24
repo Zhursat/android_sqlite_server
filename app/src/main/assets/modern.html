@@ -233,7 +233,7 @@ el('tile_control').textContent=modeOrigin==='—'?'—':controlMode+' - '+modeOr
 const curValid=num(cur),dis=fresh&&curValid&&cur<-.5,chg=fresh&&curValid&&cur>.5;
 const opr=num(i.auto_mode_active)?i.auto_mode_active:null;
 const gridIn=fresh&&i.has_grid===true&&i.on_battery===false;
-const gridDirect=gridIn&&opr===1; // only verified Pu/line state
+const gridDirect=gridIn&&(opr===0||opr===1); // verified grid/line operation in Gtd or PU
 flow('pathgridinv',gridIn);
 flow('pathgridload',gridDirect);
 flow('pathpv',fresh&&num(p.pv)&&p.pv>30);
