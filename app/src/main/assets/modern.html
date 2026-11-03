@@ -153,25 +153,32 @@ function alignEnergyPaths(){
 window.addEventListener('resize',alignEnergyPaths);
 const tileNames={gridunit:'Електромережа',pvunit:'Сонячні модулі',batteryunit:'Акумулятор · JK BMS',invunit:'Інвертор J4000HC',loadunit:'Споживачі'};
 let selectedTile=null;
-function tileDetails(tile){
- const dlg=el('tileDialog'),content=el('dialogContent');
- selectedTile=tile;
- el('dialogTitle').textContent=tileNames[tile]||'Показники';
- const src=document.querySelector('.'+tile+' .metrics');
- content.replaceChildren();
- if(src)content.appendChild(src.cloneNode(true));
- const extras=document.querySelector('.'+tile+' .tile-cells');
- if(extras)content.appendChild(extras.cloneNode(true));
- dlg.showModal();
+// Copies in the dialog must never reuse the source IDs: telemetry updates
+// use getElementById and must always target the original source elements.
+function cloneForDetails(source){
+ const copy=source.cloneNode(true);
+ if(copy.hasAttribute('id'))copy.removeAttribute('id');
+ copy.querySelectorAll('[id]').forEach(node=>node.removeAttribute('id'));
+ return copy;
 }
 function refreshTileDetails(){
  if(!selectedTile||!el('tileDialog').open)return;
  const target=document.querySelector('.'+selectedTile);
- const host=el('dialogContent');host.replaceChildren();
+ if(!target)return;
+ const host=el('dialogContent');
+ const parts=[];
  for(const selector of ['.metrics','.tile-cells']){
-  const piece=target?.querySelector(selector);
-  if(piece)host.appendChild(piece.cloneNode(true));
+  const piece=target.querySelector(selector);
+  if(piece)parts.push(cloneForDetails(piece));
  }
+ host.replaceChildren(...parts);
+}
+function tileDetails(tile){
+ const dlg=el('tileDialog');
+ selectedTile=tile;
+ el('dialogTitle').textContent=tileNames[tile]||'Показники';
+ dlg.showModal();
+ refreshTileDetails();
 }
 document.querySelectorAll('.flowgrid .unitbox').forEach(tile=>{
  tile.tabIndex=0;tile.setAttribute('role','button');tile.setAttribute('aria-label','Детальні показники: '+(tileNames[Array.from(tile.classList).find(x=>tileNames[x])]||''));
